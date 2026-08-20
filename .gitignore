@@ -1,0 +1,40 @@
+# Unity generated data and local editor state
+[Ll]ibrary/
+[Tt]emp/
+[Ll]ogs/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Uu]ser[Ss]ettings/
+MemoryCaptures/
+Recordings/
+
+# IDE and OS files
+.vs/
+.vscode/
+.idea/
+*.csproj
+*.sln
+*.user
+*.pidb
+*.pdb
+*.mdb
+.DS_Store
+
+# Local evidence/logs may contain machine-specific paths or runtime data.
+Evidence/
+*.log
+
+# Abandoned local XR package experiments and Python bytecode.
+Packages/EmbeddedXr/
+Packages/LocalXr/
+__pycache__/
+
+# Do not publish credentials or signing material.
+*.keystore
+*.jks
+*.pem
+*.p12
+*.mobileprovision
+.env
+.env.*

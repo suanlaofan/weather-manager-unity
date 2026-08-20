@@ -1,0 +1,384 @@
+{
+  "collection": "vs_low_poly_v2",
+  "source": "ange-embed",
+  "license": "ange-embed",
+  "importedAt": "2026-08-14",
+  "runtimeLoading": false,
+  "requiredExtensions": [
+    "KHR_texture_basisu"
+  ],
+  "unityPackages": {
+    "com.unity.cloud.gltfast": "6.19.0",
+    "com.unity.cloud.ktx": "3.7.0"
+  },
+  "assets": [
+    {
+      "name": "Cabin",
+      "category": "Buildings",
+      "assetId": "ca47c31b-932b-476c-9c1a-1224d8296cec",
+      "url": "https://cdn-ba.holymolly.ai/1/0/1002b8d5-35c1-4639-994a-f5a70d520c94.glb",
+      "triangles": 2392,
+      "sha256": "00260b5d5c98e19eabe328c303169c2467735b9839aca0f6a24ec2b6f87fb3df"
+    },
+    {
+      "name": "StoneCottage",
+      "category": "Buildings",
+      "assetId": "6c7e4d96-d7d7-42b6-b2a3-a3a831275a6a",
+      "url": "https://cdn-ba.holymolly.ai/a/e/ae883dcc-2a9a-4af0-bc95-1a2813d83f15.glb",
+      "triangles": 2662,
+      "sha256": "002bfd12cd09d16e7d78f49048a6f0f44915ea50113240bf51e73f8c552a6c6d"
+    },
+    {
+      "name": "SimpleHouse",
+      "category": "Buildings",
+      "assetId": "09eac09b-a931-4c50-88a9-883778bb8ea2",
+      "url": "https://cdn-ba.holymolly.ai/6/3/63ba36d4-12e4-4da6-8a51-0fd4268be97d.glb",
+      "triangles": 1594,
+      "sha256": "15f784060c70637bd0b0a985d789306c22ae82a2844a9d615271c674ad858cc8"
+    },
+    {
+      "name": "Pine",
+      "category": "Vegetation",
+      "assetId": "d199eb4d-91b2-499e-9c59-de018dd4cb6c",
+      "url": "https://cdn-ba.holymolly.ai/f/8/f8c19e6f-0ce6-4b2d-b5b8-7f594b481969.glb",
+      "triangles": 1698,
+      "sha256": "60b98550e9f780277888fc6de3a857dd7741fc8dea3b7a0ab98a0f14c6a8a5e2"
+    },
+    {
+      "name": "ConeTree",
+      "category": "Vegetation",
+      "assetId": "e7b51141-7c90-438f-aa46-0def76673de0",
+      "url": "https://cdn-ba.holymolly.ai/5/d/5d0ae4da-b7d7-4f54-a785-fe4ea41ade6f.glb",
+      "triangles": 1682,
+      "sha256": "8d448cf30a6d7d199fdc825405fd83d585a3914bb2ac81dcfe1315f3de594298"
+    },
+    {
+      "name": "FacetedTree",
+      "category": "Vegetation",
+      "assetId": "c77bb4c4-50d2-4a6d-b040-62b1f3b3b741",
+      "url": "https://cdn-ba.holymolly.ai/9/2/9290d709-6b99-4386-b667-b02addad313d.glb",
+      "triangles": 2714,
+      "sha256": "b09c63295ea7af9009f26676828d4c62eeb37e5f4823532f8dfdc98f2af4bd03"
+    },
+    {
+      "name": "Bench",
+      "category": "Props",
+      "assetId": "6cf6a035-0171-416e-83b5-318c63400169",
+      "url": "https://cdn-ba.holymolly.ai/4/0/40358120-b7ab-4729-ac07-be31bf5b6f9f.glb",
+      "triangles": 1204,
+      "sha256": "e2c3e5d2556adcaff3f5e278b75970b30a9ccbc103bb359126d4056f25c87812"
+    },
+    {
+      "name": "Cart",
+      "category": "Props",
+      "assetId": "7b41893f-94be-4889-9a68-b45c739ccc76",
+      "url": "https://cdn-ba.holymolly.ai/8/9/89e1e617-000d-44f3-8c66-66a69e3fd0a3.glb",
+      "triangles": 1906,
+      "sha256": "6f07d8030c522bb9b2e284d62e6ce7c701bd01ab73add0fd7b33fc1196e1b390"
+    },
+    {
+      "name": "Well",
+      "category": "Props",
+      "assetId": "a90005fb-f318-47b0-8c2a-f68854c9964c",
+      "url": "https://cdn-ba.holymolly.ai/0/c/0c351684-fb54-4b9b-94c9-dc36e93a5bc8.glb",
+      "triangles": 2502,
+      "sha256": "cffb7fd1cf1a938a25b9e0fc4abe9e40be2053e5470d07b9c0630fbb35810af6"
+    },
+    {
+      "name": "Lamp",
+      "category": "Props",
+      "assetId": "4d8ef258-aa02-42e4-9bd2-770134f8f731",
+      "url": "https://cdn-ba.holymolly.ai/4/6/46f697ab-0e29-4b61-b45a-586e398b2642.glb",
+      "triangles": 1608,
+      "sha256": "9ea0674cc1e2f7fbfcdfda87b58a1362078257b3b09b8f23fbabd7efbd485158"
+    },
+    {
+      "name": "Fence",
+      "category": "Props",
+      "assetId": "824d3c8b-ed69-4844-bf1c-b93fbaa029ac",
+      "url": "https://cdn-ba.holymolly.ai/2/8/280f9ead-8ed5-4e4a-a12a-c823fb675398.glb",
+      "triangles": 1732,
+      "sha256": "0685d924565010d4cf11f84e0b4bf2f26dc030a6f4aac9d6fa29c3692a058633"
+    },
+    {
+      "name": "Lodge",
+      "category": "Buildings",
+      "assetId": "82e31b3b-8552-4f89-a0da-28e921dce506",
+      "url": "https://cdn-ba.holymolly.ai/6/4/64bda380-bd26-4b62-87a6-fb86a9a5b409.glb",
+      "triangles": 3940,
+      "sha256": "fdae52a531adf7f502e4ce951c07aeb03610f8c75cd55f642f2d293ec536625a"
+    },
+    {
+      "name": "RedBarn",
+      "category": "Buildings",
+      "assetId": "0999493d-ec7b-4f85-a28b-a94869748423",
+      "url": "https://cdn-ba.holymolly.ai/e/b/eb7b500d-6688-4f62-a08e-3985c905cf33.glb",
+      "triangles": 1604,
+      "sha256": "ec6b367e6e19cfb3bad4fe77424e2834474ad13e289fb3bc5561a09a61b4b6a2"
+    },
+    {
+      "name": "RuinedShed",
+      "category": "Disaster",
+      "assetId": "6bc28bfb-1269-470a-b9dc-205610737a42",
+      "url": "https://cdn-ba.holymolly.ai/5/5/55615a2b-ca21-4522-85f8-77c57760b068.glb",
+      "triangles": 2527,
+      "sha256": "9e4a41a73a5568d6160262d6a944b3a72f68df0dfc7970ff9e22fbe4f6a5def6"
+    },
+    {
+      "name": "Windmill",
+      "category": "Landmarks",
+      "assetId": "3f90ba9e-eb51-4da3-a954-749e9217fd7b",
+      "url": "https://cdn-ba.holymolly.ai/5/5/5540fc03-e938-4f89-94da-0dda3f146ccb.glb",
+      "triangles": 2686,
+      "sha256": "89e626db801a1b3bef2eb88f4b82646385c1aa38cfe4033ccfcea08ed9852347"
+    },
+    {
+      "name": "WaterWheel",
+      "category": "Landmarks",
+      "assetId": "ed00a63d-73ac-478e-b3ff-4ec38b8da340",
+      "url": "https://cdn-ba.holymolly.ai/8/d/8da3d4a9-20cb-4dd6-9db8-0f04ee523b5a.glb",
+      "triangles": 2482,
+      "sha256": "abe94ed843f51348935742a08c301cb3c33bd21606bce0f502e188ee9e4aa351"
+    },
+    {
+      "name": "Bridge",
+      "category": "Landmarks",
+      "assetId": "8137a863-2cad-46c3-92c7-5812af6300fe",
+      "url": "https://cdn-ba.holymolly.ai/3/b/3b5f1a90-966a-4d04-8a9a-e9428c6848d0.glb",
+      "triangles": 1667,
+      "sha256": "9b8e5879c4a5ae1b48225e10c15e761b6fb4fb450f7e71975880d04cb29a0417"
+    },
+    {
+      "name": "Gazebo",
+      "category": "Landmarks",
+      "assetId": "5e19b658-fc3a-46f8-9059-b1b52d559067",
+      "url": "https://cdn-ba.holymolly.ai/c/5/c5cb7e12-cbd9-4007-a421-cbce22fe5caf.glb",
+      "triangles": 2586,
+      "sha256": "896daac31a70aa35b2b2d1dc512e8070c673a23390ade898624e09c5260db0a0"
+    },
+    {
+      "name": "RockCluster",
+      "category": "Nature",
+      "assetId": "a17e0aba-5e4b-48f7-89af-2527dded140b",
+      "url": "https://cdn-ba.holymolly.ai/9/c/9c3a9fe1-b6ac-4cbe-a9b2-b87013563d3a.glb",
+      "triangles": 2680,
+      "sha256": "523e0f863ae73119510710fb6a11ec0eecb30668b0c64f1abc00db12ef5cbc90"
+    },
+    {
+      "name": "MossRock",
+      "category": "Nature",
+      "assetId": "f8e3ba18-243d-4dcd-91d9-12b09d723070",
+      "url": "https://cdn-ba.holymolly.ai/4/d/4db9c748-9983-48a4-bdb6-3b2d5c603f7c.glb",
+      "triangles": 1700,
+      "sha256": "7f744d82a40e0ca7592c700354acaed9f3e244a0749dec16394ed4eb6b9ed90b"
+    },
+    {
+      "name": "Flowers",
+      "category": "Nature",
+      "assetId": "3d02fccd-4661-4a8b-8259-723a3fa9d994",
+      "url": "https://cdn-ba.holymolly.ai/3/5/3560c05f-c178-4fa2-bd0c-36970fd7605d.glb",
+      "triangles": 2698,
+      "sha256": "524317a6dec4b4388e10bf637164dd370449fb9fb8424b676c6638dbc18633ad"
+    },
+    {
+      "name": "Bush",
+      "category": "Nature",
+      "assetId": "8a645f20-6154-4887-a7b0-b7a6b13f49b7",
+      "url": "https://cdn-ba.holymolly.ai/4/7/47ce6c43-5186-4005-9036-ade8ec416a4e.glb",
+      "triangles": 2704,
+      "sha256": "876732ed82711d0c5fa72ad6a4624f3bdd2441a2817ab4e831f6f869114ef57a"
+    },
+    {
+      "name": "Barrel",
+      "category": "Props",
+      "assetId": "ee018247-b63f-402e-87e3-072ee3f05d73",
+      "url": "https://cdn-ba.holymolly.ai/a/0/a01f8756-9f34-4742-a5ad-e8606f3f4f99.glb",
+      "triangles": 1596,
+      "sha256": "d6ab3008e741568ff253ed27fd69cf562df4d8af82399d52cfcb4eddd9dda8bf"
+    },
+    {
+      "name": "HayBale",
+      "category": "Props",
+      "assetId": "d4a61384-02be-4ad5-88ed-46ca231a2769",
+      "url": "https://cdn-ba.holymolly.ai/7/7/7765be1a-8d5c-4145-afb9-9fcb44a1b99b.glb",
+      "triangles": 1636,
+      "sha256": "55499091e1f215abc454717ee5a8dca5bb76516508f6c7a3c504a786bba19c63"
+    },
+    {
+      "name": "Signpost",
+      "category": "Props",
+      "assetId": "9b4ece76-0988-45ad-aa1c-a66de9a78a47",
+      "url": "https://cdn-ba.holymolly.ai/2/9/292dcf1b-8131-4712-9cfa-e9f2d45c0a1e.glb",
+      "triangles": 2618,
+      "sha256": "0cb1415dc4314ed5cae332a6cce13691d46b42f103c9bffeb0d135a3f97cff4b"
+    },
+    {
+      "name": "FireHydrant",
+      "category": "Props",
+      "assetId": "8e4b507e-7bc6-4e6f-93b7-caa6cc87e736",
+      "url": "https://cdn-ba.holymolly.ai/b/8/b857dbbe-8019-4412-affa-3653dd456c4f.glb",
+      "triangles": 1688,
+      "sha256": "e3e97ef3acbcc000197c98202c673544cb3c293205b62413e4ff32746e14c82f"
+    },
+    {
+      "name": "Rowboat",
+      "category": "Props",
+      "assetId": "aa610a8c-af7a-46d9-93a8-0a26969f87e1",
+      "url": "https://cdn-ba.holymolly.ai/1/a/1a48b8b1-8703-4af4-9c58-1d64f174614d.glb",
+      "triangles": 1774,
+      "sha256": "c657bdd43bba45c724cfe68aa7eff80b069fe7c0954d47784ad97ac2cbee1c66"
+    },
+    {
+      "name": "Stump",
+      "category": "Disaster",
+      "assetId": "ac911bfc-b8b2-4349-bc8f-c2ce2def111e",
+      "url": "https://cdn-ba.holymolly.ai/5/7/57f84a2d-f5e7-4758-b773-d62f7747b57d.glb",
+      "triangles": 1706,
+      "sha256": "06aaf331a68b73490cbdc4739c7388d88259427e48064482578563274c89db39"
+    },
+    {
+      "name": "WoodDebris",
+      "category": "Disaster",
+      "assetId": "c7e2f587-326f-4da7-9011-d2e8448b2b22",
+      "url": "https://cdn-ba.holymolly.ai/d/6/d671483f-f208-4795-9d41-f29e0ab04d9b.glb",
+      "triangles": 1644,
+      "sha256": "4e9c5b26164477f0fea3ff58e74c8d5f6549ff2e0c312992058340eda4e1b38c"
+    },
+    {
+      "name": "CompactMint",
+      "category": "Vehicles",
+      "assetId": "d4cf0f97-6720-46d2-8052-d07282792ec3",
+      "url": "https://cdn-ba.holymolly.ai/6/8/68276da0-2760-442c-a230-46ac6b63a243.glb",
+      "triangles": 1580,
+      "sha256": "f2ce54575532a4f655cb2e256cb95d34b7baac7f61c97b01fff465a1a84e4197"
+    },
+    {
+      "name": "BlueToyCar",
+      "category": "Vehicles",
+      "assetId": "0051abff-8e82-4bc7-af8b-2931e6439e1f",
+      "url": "https://cdn-ba.holymolly.ai/a/0/a03a0a2e-7223-4398-881a-0d3448096412.glb",
+      "triangles": 1578,
+      "sha256": "8c8847a8bb98c98c41df05c4a0e972c06110a35aa82773c47fb562ad2c8a29e2"
+    },
+    {
+      "name": "YellowBlockSedan",
+      "category": "Vehicles",
+      "assetId": "ed5d3eb6-602b-4b96-accf-ddfe1aef5341",
+      "url": "https://cdn-ba.holymolly.ai/4/9/4994f210-2ab8-4cf3-b826-9913defd24f0.glb",
+      "triangles": 2520,
+      "sha256": "0128786e043bddc24ed626527d030f7164209ed5dcf50c496f75a12fadc52e1e"
+    },
+    {
+      "name": "WreckedCar",
+      "category": "Vehicles",
+      "assetId": "e0af7468-03d4-4e8d-b750-28c03c7c0374",
+      "url": "https://cdn-ba.holymolly.ai/f/5/f533627e-4fac-4dad-8564-88a2183a527a.glb",
+      "triangles": 2682,
+      "sha256": "c411e3a11c5d81c7960daa9707389572e013a2dcd638fe592d20f82fb487e0aa"
+    },
+    {
+      "name": "MiningTruck",
+      "category": "Vehicles",
+      "assetId": "5233d8c7-93a6-48f3-b95f-0493c32fdf60",
+      "url": "https://cdn-ba.holymolly.ai/3/e/3e2e186a-3b22-4d00-8feb-32d3600603bf.glb",
+      "triangles": 2910,
+      "sha256": "d8bf2c9d2c41990f5c3f94bbfd98820296c9882a7ab9d2d45844fdc04aac4033"
+    },
+    {
+      "name": "RustSilo",
+      "category": "Farm",
+      "assetId": "d08f7b9d-c693-475a-9478-742255f5e0b1",
+      "url": "https://cdn-ba.holymolly.ai/d/d/dda7bcb1-01c4-4317-a4c0-90bafde5f875.glb",
+      "triangles": 1812,
+      "sha256": "817e4a405f2244fe56cd7c90689520ea398c14e22d93f09d072eca0caecb6c53"
+    },
+    {
+      "name": "Scarecrow",
+      "category": "Farm",
+      "assetId": "69d0b7db-7c59-4d9c-af97-96c499856615",
+      "url": "https://cdn-ba.holymolly.ai/8/f/8fa3e39b-89e7-4559-b5c7-78e59f7eda6c.glb",
+      "triangles": 2610,
+      "sha256": "c373797f382953284621837d6e7c06bb1c4944a6ebc398088c1d04c58729a89e"
+    },
+    {
+      "name": "GrassClump",
+      "category": "Farm",
+      "assetId": "76a50fd8-d02b-4f9f-b3d8-f7db997402c9",
+      "url": "https://cdn-ba.holymolly.ai/d/4/d4cfaff7-205b-48d1-83ac-960d0547e6de.glb",
+      "triangles": 2666,
+      "sha256": "03d7d1408d8c04227b7d751d280dc7e789c333ee0e6f88299d292a3757952b7b"
+    },
+    {
+      "name": "StorageShed",
+      "category": "Farm",
+      "assetId": "41b0b152-7c37-4f17-bd98-68d4f1a9b55a",
+      "url": "https://cdn-ba.holymolly.ai/7/5/753a9732-3040-41fe-99f7-ad51fe21aefa.glb",
+      "triangles": 1546,
+      "sha256": "26f42fce0c89fa520dea1ad9307b46c35dfe954ee713935d961896143de60c73"
+    },
+    {
+      "name": "WoodenDock",
+      "category": "Coastal",
+      "assetId": "7a126880-92bf-463b-99a0-048d6cebd559",
+      "url": "https://cdn-ba.holymolly.ai/8/0/80f068db-38d6-427a-a830-090feea985d8.glb",
+      "triangles": 1582,
+      "sha256": "a468109ad39da252a21e52659ce308654987e403167f08196c4999150fb77ef1"
+    },
+    {
+      "name": "WoodenDam",
+      "category": "Coastal",
+      "assetId": "ee3a91fe-f9e6-492a-b27d-214ba3e08795",
+      "url": "https://cdn-ba.holymolly.ai/f/0/f07dd953-8d3c-4313-b6e3-85fb4beedbb8.glb",
+      "triangles": 2316,
+      "sha256": "e6068ca12980d7454c1c0886255d4c4e6ef9d40ee07c7ec93545b30084df0171"
+    },
+    {
+      "name": "StoneBridge",
+      "category": "Coastal",
+      "assetId": "1388d34e-d5b9-4171-8b94-01f493c0098b",
+      "url": "https://cdn-ba.holymolly.ai/4/1/41276267-7545-4624-a03b-af6828803ce2.glb",
+      "triangles": 2331,
+      "sha256": "198f5998f4a1621f0fe3e6e9d76e36024bf50e8597f7fea75640ff3dfa684221"
+    },
+    {
+      "name": "GreyBoulder",
+      "category": "Highland",
+      "assetId": "544093dd-3e22-485a-a0ad-1360bba3f35b",
+      "url": "https://cdn-ba.holymolly.ai/c/7/c7ee0889-0e17-4545-a8e8-169617de9273.glb",
+      "triangles": 1666,
+      "sha256": "55ef1ab430582ad60afc6c539e3caafce77b621c82578adb0b65c53d5d42bceb"
+    },
+    {
+      "name": "StackedCliff",
+      "category": "Highland",
+      "assetId": "ae1c8674-2d79-43c0-8759-fb5741fe14ab",
+      "url": "https://cdn-ba.holymolly.ai/5/8/5865bcf2-8efd-4f7c-92b9-6d27e409a68f.glb",
+      "triangles": 2596,
+      "sha256": "e98fc19ab507aab35d34e94b2f0fe147c3eb54c7a6fc327e9822b15e4ed2664c"
+    },
+    {
+      "name": "FallenTree",
+      "category": "Nature",
+      "assetId": "64b74960-389e-45f7-8ae4-274004bf71f1",
+      "url": "https://cdn-ba.holymolly.ai/4/8/48a32cca-00a5-4ef3-bc94-79bb0248c66d.glb",
+      "triangles": 2646,
+      "sha256": "0f76c7f200be23195f4c9003eba32c9cdfe6a729fd0a204c9220c7c40758b76c"
+    },
+    {
+      "name": "DeadTree",
+      "category": "Nature",
+      "assetId": "6a666ccc-87e7-4094-90f5-2d6a774a335d",
+      "url": "https://cdn-ba.holymolly.ai/9/5/95ff9744-b7e5-4f82-9d88-0ee1aacb8270.glb",
+      "triangles": 2648,
+      "sha256": "9a148e079c2d46e33eb134eb8c2fa4b40de0fa3f93e2bf595be98bd0c62305c9"
+    },
+    {
+      "name": "SplitRailFence",
+      "category": "Nature",
+      "assetId": "03bf0537-24ab-4abc-86cb-016a72348abc",
+      "url": "https://cdn-ba.holymolly.ai/8/c/8caab95f-2ae7-443c-9cab-cead605740ad.glb",
+      "triangles": 1704,
+      "sha256": "d0555d93a214e95c9e4d455ac31b9a623e07dc6518dc340f6be38323e198e72f"
+    }
+  ]
+}
