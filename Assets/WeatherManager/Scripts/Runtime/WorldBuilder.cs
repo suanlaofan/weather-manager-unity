@@ -9,6 +9,7 @@ namespace WeatherManager
     {
         private sealed class VehicleRuntime
         {
+            private readonly WorldBuilder world;
             private readonly DamageableState state;
             private readonly Vector3[] route;
             private readonly LowPolyTerrainGenerator terrain;
@@ -18,12 +19,14 @@ namespace WeatherManager
             private float animationTime;
 
             public VehicleRuntime(
+                WorldBuilder worldBuilder,
                 DamageableState damageable,
                 Vector3[] path,
                 int nextTarget,
                 float moveSpeed,
                 LowPolyTerrainGenerator terrainSurface)
             {
+                world = worldBuilder;
                 state = damageable;
                 route = path;
                 terrain = terrainSurface;
@@ -39,7 +42,10 @@ namespace WeatherManager
                     return;
                 }
 
-                var hazard = simulation.Sample(state.Root.position);
+                var currentPosition = world != null
+                    ? world.GetGameplayPosition(state)
+                    : state.Root.position;
+                var hazard = simulation.Sample(currentPosition);
                 var speedFactor = Mathf.Clamp01(
                     1f
                     - hazard.Flood * 0.84f
@@ -53,13 +59,13 @@ namespace WeatherManager
 
                 animationTime += delta;
                 var target = route[targetIndex];
-                var toTarget = target - state.Root.position;
+                var toTarget = target - currentPosition;
                 toTarget.y = 0f;
                 if (toTarget.sqrMagnitude < 0.25f)
                 {
                     targetIndex = (targetIndex + 1) % route.Length;
                     target = route[targetIndex];
-                    toTarget = target - state.Root.position;
+                    toTarget = target - currentPosition;
                     toTarget.y = 0f;
                 }
 
@@ -69,12 +75,33 @@ namespace WeatherManager
                 }
 
                 var direction = toTarget.normalized;
-                var nextPosition = state.Root.position + direction * (speed * speedFactor * delta);
+                var nextPosition = currentPosition + direction * (speed * speedFactor * delta);
                 nextPosition.y = (terrain != null ? terrain.SampleHeight(nextPosition) + 0.13f : state.InitialPosition.y)
                     + Mathf.Sin(animationTime * 7f) * hazard.Flood * 0.035f;
-                state.Root.position = nextPosition;
+                if (world != null)
+                {
+                    world.SetGameplayPosition(state.Root, nextPosition);
+                }
+                else
+                {
+                    state.Root.position = nextPosition;
+                }
                 var targetRotation = VehicleRoadRotation(direction);
-                state.Root.rotation = Quaternion.Slerp(state.Root.rotation, targetRotation, 1f - Mathf.Exp(-delta * 7f));
+                var currentRotation = world != null
+                    ? world.GetGameplayRotation(state.Root)
+                    : state.Root.rotation;
+                var nextRotation = Quaternion.Slerp(
+                    currentRotation,
+                    targetRotation,
+                    1f - Mathf.Exp(-delta * 7f));
+                if (world != null)
+                {
+                    world.SetGameplayRotation(state.Root, nextRotation);
+                }
+                else
+                {
+                    state.Root.rotation = nextRotation;
+                }
             }
 
             public void Reset()
@@ -115,6 +142,9 @@ namespace WeatherManager
         [SerializeField] private Transform buildingsRoot;
         [SerializeField] private Transform vegetationRoot;
         [SerializeField] private Transform residentsRoot;
+        // The common authored island root.  In MR it is moved and uniformly
+        // scaled onto a table; simulation coordinates must remain local to it.
+        [SerializeField] private Transform gameplayRoot;
         [SerializeField] private Transform nightLightsRoot;
         [SerializeField] private BiomeMap biomeMap;
         [SerializeField] private LowPolyTerrainGenerator terrainGenerator;
@@ -269,12 +299,14 @@ namespace WeatherManager
                 {
                     RefreshBaseColors(record);
                 }
-                if (record.InitialScale == Vector3.zero)
-                {
-                    record.InitialPosition = record.Root.position;
-                    record.InitialRotation = record.Root.rotation;
-                    record.InitialScale = record.Root.localScale;
-                }
+                // Preserve the authored local pose as the Reset baseline.
+                // A later initialization can happen after
+                // MrTabletopExperience has moved/scaled the tabletop into
+                // physical metres; recapturing then would make Reset restore
+                // an MR world-space pose and send buildings off the island.
+                // New/generated records are captured by RegisterDamageable;
+                // older baked scenes migrate their missing local baseline here.
+                EnsureInitialPose(record);
             }
 
             for (var index = 0; index < residents.Count; index++)
@@ -362,6 +394,65 @@ namespace WeatherManager
             return terrainGenerator != null ? terrainGenerator.SampleNormal(position) : Vector3.up;
         }
 
+        /// <summary>
+        /// Converts an authored object pose back into simulation/gameplay
+        /// coordinates.  This remains identity for the Editor and desktop,
+        /// while PICO MR removes the physical tabletop pose and scale.
+        /// </summary>
+        public Vector3 GetGameplayPosition(Transform source)
+        {
+            if (source == null)
+            {
+                return Vector3.zero;
+            }
+
+            var root = ResolveGameplayRoot();
+            return root != null ? root.InverseTransformPoint(source.position) : source.position;
+        }
+
+        public Vector3 GetGameplayPosition(DamageableState record)
+        {
+            if (record == null)
+            {
+                return Vector3.zero;
+            }
+
+            return record.Root != null ? GetGameplayPosition(record.Root) : record.InitialPosition;
+        }
+
+        public Quaternion GetGameplayRotation(Transform source)
+        {
+            if (source == null)
+            {
+                return Quaternion.identity;
+            }
+
+            var root = ResolveGameplayRoot();
+            return root != null ? Quaternion.Inverse(root.rotation) * source.rotation : source.rotation;
+        }
+
+        public void SetGameplayPosition(Transform target, Vector3 gameplayPosition)
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            var root = ResolveGameplayRoot();
+            target.position = root != null ? root.TransformPoint(gameplayPosition) : gameplayPosition;
+        }
+
+        public void SetGameplayRotation(Transform target, Quaternion gameplayRotation)
+        {
+            if (target == null)
+            {
+                return;
+            }
+
+            var root = ResolveGameplayRoot();
+            target.rotation = root != null ? root.rotation * gameplayRotation : gameplayRotation;
+        }
+
         public int RebuildCompactIslandSurface()
         {
             EnsureResources();
@@ -409,11 +500,11 @@ namespace WeatherManager
                 var state = damageables[index];
                 if (state == null || state.Kind != DamageableKind.Vehicle || state.Root == null) continue;
                 var targetIndex = Mathf.Clamp(state.VehicleRouteTargetIndex, 0, route.Length - 1);
-                var direction = route[targetIndex] - state.Root.position;
+                var direction = route[targetIndex] - GetGameplayPosition(state);
                 direction.y = 0f;
                 if (direction.sqrMagnitude <= 0.001f) continue;
-                state.Root.rotation = VehicleRoadRotation(direction);
-                state.InitialRotation = state.Root.rotation;
+                SetGameplayRotation(state.Root, VehicleRoadRotation(direction));
+                CaptureInitialPose(state);
                 aligned++;
             }
             RebuildVehicleRuntime();
@@ -471,12 +562,15 @@ namespace WeatherManager
                 record.VisualStage = DamageVisualStage.Healthy;
                 if (record.Root != null)
                 {
-                    record.Root.position = record.InitialPosition;
-                    record.Root.rotation = record.InitialRotation;
+                    EnsureInitialPose(record);
+                    record.Root.localPosition = record.InitialLocalPosition;
+                    record.Root.localRotation = record.InitialLocalRotation;
                     record.Root.localScale = record.InitialScale;
                 }
                 ApplyDamageVisual(record);
             }
+
+            LogResetVisualRecovery();
 
             for (var index = 0; index < vehicles.Count; index++) vehicles[index].Reset();
             for (var index = 0; index < residents.Count; index++) residents[index]?.ResetAgent();
@@ -566,12 +660,13 @@ namespace WeatherManager
             return DamageVisualStage.Healthy;
         }
 
-        private static void ApplyDamageStageTransform(DamageableState record, DamageVisualStage stage)
+        private void ApplyDamageStageTransform(DamageableState record, DamageVisualStage stage)
         {
             if (record.Root == null) return;
 
             var sign = (record.Id & 1) == 0 ? 1f : -1f;
-            var rotation = record.InitialRotation;
+            EnsureInitialPose(record);
+            var rotation = record.InitialLocalRotation;
             var scaleMultiplier = Vector3.one;
 
             switch (record.Kind)
@@ -612,11 +707,11 @@ namespace WeatherManager
                     };
                     if (stage == DamageVisualStage.Destroyed)
                     {
-                        rotation = record.Root.rotation * Quaternion.Euler(0f, 0f, sign * 28f);
+                        rotation = record.Root.localRotation * Quaternion.Euler(0f, 0f, sign * 28f);
                     }
                     else
                     {
-                        rotation = record.Root.rotation;
+                        rotation = record.Root.localRotation;
                     }
                     break;
                 case DamageableKind.Infrastructure:
@@ -655,7 +750,7 @@ namespace WeatherManager
                     break;
             }
 
-            record.Root.rotation = rotation;
+            record.Root.localRotation = rotation;
             record.Root.localScale = Vector3.Scale(record.InitialScale, scaleMultiplier);
         }
 
@@ -912,7 +1007,7 @@ namespace WeatherManager
                 var state = RegisterDamageable(root, DamageableKind.Vehicle, 0.82f, 68f, 0.6f, 1.05f, 0.46f, 0.84f);
                 state.VehicleRouteTargetIndex = nextIndex;
                 state.VehicleSpeed = 2.25f + (index % 3) * 0.2f;
-                vehicles.Add(new VehicleRuntime(state, route, nextIndex, state.VehicleSpeed, terrainGenerator));
+                vehicles.Add(new VehicleRuntime(this, state, route, nextIndex, state.VehicleSpeed, terrainGenerator));
             }
         }
 
@@ -1019,8 +1114,6 @@ namespace WeatherManager
                 Root = root,
                 Renderers = renderers,
                 BaseColors = baseColors,
-                InitialPosition = root.position,
-                InitialRotation = root.rotation,
                 InitialScale = root.localScale,
                 Radius = radius,
                 MaxHealth = health,
@@ -1031,6 +1124,7 @@ namespace WeatherManager
                 WindVulnerability = windVulnerability,
                 VisualStage = DamageVisualStage.Healthy
             };
+            CaptureInitialPose(state);
             damageables.Add(state);
             return state;
         }
@@ -1104,15 +1198,16 @@ namespace WeatherManager
             {
                 var record = damageables[index];
                 if (record == null || record.Root == null) continue;
-                var before = record.Root.position.y;
-                var position = TerrainPoint(record.Root.position, record.Kind == DamageableKind.Farm ? 0.12f : 0.08f);
-                record.Root.position = position;
+                var gameplayPosition = GetGameplayPosition(record);
+                var before = gameplayPosition.y;
+                var position = TerrainPoint(gameplayPosition, record.Kind == DamageableKind.Farm ? 0.12f : 0.08f);
+                SetGameplayPosition(record.Root, position);
                 if (record.Kind == DamageableKind.Tree)
                 {
-                    record.Root.rotation = Quaternion.Euler(0f, record.Root.eulerAngles.y, 0f);
+                    var rotation = GetGameplayRotation(record.Root);
+                    SetGameplayRotation(record.Root, Quaternion.Euler(0f, rotation.eulerAngles.y, 0f));
                 }
-                record.InitialPosition = record.Root.position;
-                record.InitialRotation = record.Root.rotation;
+                CaptureInitialPose(record);
                 maxError = Mathf.Max(maxError, Mathf.Abs(before - position.y));
             }
 
@@ -1249,10 +1344,10 @@ namespace WeatherManager
                 if (targetIndex < 0 || targetIndex >= route.Length)
                 {
                     var nearestIndex = 0;
-                    var nearestDistance = float.PositiveInfinity;
-                    for (var routeIndex = 0; routeIndex < route.Length; routeIndex++)
-                    {
-                        var distance = (route[routeIndex] - state.InitialPosition).sqrMagnitude;
+                var nearestDistance = float.PositiveInfinity;
+                for (var routeIndex = 0; routeIndex < route.Length; routeIndex++)
+                {
+                    var distance = (route[routeIndex] - state.InitialPosition).sqrMagnitude;
                         if (distance >= nearestDistance) continue;
                         nearestDistance = distance;
                         nearestIndex = routeIndex;
@@ -1265,15 +1360,117 @@ namespace WeatherManager
                 {
                     state.VehicleSpeed = 2.25f + (vehicles.Count % 3) * 0.2f;
                 }
-                var direction = route[targetIndex] - state.Root.position;
+                var direction = route[targetIndex] - GetGameplayPosition(state);
                 direction.y = 0f;
                 if (direction.sqrMagnitude > 0.001f)
                 {
-                    state.Root.rotation = VehicleRoadRotation(direction);
-                    state.InitialRotation = state.Root.rotation;
+                    SetGameplayRotation(state.Root, VehicleRoadRotation(direction));
+                    CaptureInitialPose(state);
                 }
-                vehicles.Add(new VehicleRuntime(state, route, targetIndex, state.VehicleSpeed, terrainGenerator));
+                vehicles.Add(new VehicleRuntime(this, state, route, targetIndex, state.VehicleSpeed, terrainGenerator));
             }
+        }
+
+        private void EnsureInitialPose(DamageableState record)
+        {
+            if (record == null || record.Root == null)
+            {
+                return;
+            }
+
+            if (!record.HasLocalTransformBaseline)
+            {
+                // Existing serialized scenes predate local baseline fields. At
+                // Awake they still have their authored, unscaled local pose,
+                // so migrate once before MrTabletopExperience applies scale.
+                record.InitialLocalPosition = record.Root.localPosition;
+                record.InitialLocalRotation = record.Root.localRotation;
+                record.HasLocalTransformBaseline = true;
+            }
+
+            if (record.InitialScale == Vector3.zero)
+            {
+                record.InitialScale = record.Root.localScale;
+            }
+        }
+
+        private void CaptureInitialPose(DamageableState record)
+        {
+            if (record == null || record.Root == null)
+            {
+                return;
+            }
+
+            record.InitialPosition = GetGameplayPosition(record.Root);
+            record.InitialRotation = GetGameplayRotation(record.Root);
+            record.InitialLocalPosition = record.Root.localPosition;
+            record.InitialLocalRotation = record.Root.localRotation;
+            record.InitialScale = record.Root.localScale;
+            record.HasLocalTransformBaseline = true;
+        }
+
+        private Transform ResolveGameplayRoot()
+        {
+            if (gameplayRoot != null)
+            {
+                return gameplayRoot;
+            }
+
+            var roots = new[] { environmentRoot, buildingsRoot, vegetationRoot, residentsRoot };
+            for (var rootIndex = 0; rootIndex < roots.Length; rootIndex++)
+            {
+                for (var current = roots[rootIndex]; current != null; current = current.parent)
+                {
+                    if (current.name != "Weather Tabletop Island")
+                    {
+                        continue;
+                    }
+
+                    gameplayRoot = current;
+                    return gameplayRoot;
+                }
+            }
+
+            return null;
+        }
+
+        private void LogResetVisualRecovery()
+        {
+            var restored = 0;
+            var healthyVisuals = 0;
+            var activeRenderers = 0;
+            for (var index = 0; index < damageables.Count; index++)
+            {
+                var record = damageables[index];
+                if (record == null || record.Root == null)
+                {
+                    continue;
+                }
+
+                restored++;
+                var binding = record.Root.GetComponent<AngeVisualBinding>();
+                if (binding != null && binding.VisualRoot != null && binding.VisualRoot.gameObject.activeInHierarchy)
+                {
+                    healthyVisuals++;
+                }
+
+                var renderers = record.Renderers ?? Array.Empty<Renderer>();
+                for (var rendererIndex = 0; rendererIndex < renderers.Length; rendererIndex++)
+                {
+                    var renderer = renderers[rendererIndex];
+                    if (renderer != null && renderer.enabled && renderer.gameObject.activeInHierarchy)
+                    {
+                        activeRenderers++;
+                    }
+                }
+            }
+
+            var root = ResolveGameplayRoot();
+            Debug.Log(
+                $"WEATHER_MANAGER_RESET_VISUALS:records={damageables.Count}:restored={restored}:"
+                + $"healthyVisuals={healthyVisuals}:activeRenderers={activeRenderers}:"
+                + $"gameplayRoot={(root != null ? root.name : "none")}:"
+                + $"rootScale={(root != null ? root.lossyScale.ToString("F3") : "1.000")}");
         }
 
         private static Quaternion VehicleRoadRotation(Vector3 direction)

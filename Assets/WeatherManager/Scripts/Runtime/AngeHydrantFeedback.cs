@@ -15,6 +15,7 @@ namespace WeatherManager
         [SerializeField] private float feedbackRadius = 15f;
         private MaterialPropertyBlock propertyBlock;
         private float pulse;
+        private WorldBuilder world;
 
         public void Configure(Renderer[] targetRenderers, float radius)
         {
@@ -30,7 +31,12 @@ namespace WeatherManager
             {
                 var hydrant = Active[index];
                 if (hydrant == null) continue;
-                var distance = (hydrant.transform.position - position).sqrMagnitude;
+                // Extinguish events originate from DisasterSimulation in
+                // authored gameplay coordinates. Convert each hydrant from its
+                // potentially transformed MR tabletop pose before comparing the
+                // radius, otherwise the physical meter-scale transform makes
+                // every nearest-hydrant lookup incorrect.
+                var distance = (hydrant.GetGameplayPosition() - position).sqrMagnitude;
                 if (distance >= nearestDistance || distance > hydrant.feedbackRadius * hydrant.feedbackRadius)
                 {
                     continue;
@@ -89,6 +95,16 @@ namespace WeatherManager
             {
                 if (renderers[index] != null) renderers[index].SetPropertyBlock(null);
             }
+        }
+
+        private Vector3 GetGameplayPosition()
+        {
+            if (world == null)
+            {
+                world = FindFirstObjectByType<WorldBuilder>();
+            }
+
+            return world != null ? world.GetGameplayPosition(transform) : transform.position;
         }
     }
 }

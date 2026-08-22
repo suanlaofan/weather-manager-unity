@@ -28,6 +28,10 @@ Evidence/
 # Abandoned local XR package experiments and Python bytecode.
 Packages/EmbeddedXr/
 Packages/LocalXr/
+# The PICO Unity Integration is installed locally from PICO's official SDK.
+# Its vendor license forbids redistributing this embedded copy.  See README
+# for the reproducible installation path expected by manifest.json.
+Packages/com.unity.xr.picoxr/
 __pycache__/
 
 # Do not publish credentials or signing material.

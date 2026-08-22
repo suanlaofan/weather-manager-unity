@@ -17,6 +17,7 @@ namespace WeatherManager
         [SerializeField] private Vector3 localAxis = Vector3.forward;
         [SerializeField] private float idleDegreesPerSecond = 8f;
         [SerializeField] private float maximumDegreesPerSecond = 260f;
+        private WorldBuilder world;
 
         public void Configure(
             AngeEnvironmentalMotion motionMode,
@@ -41,12 +42,26 @@ namespace WeatherManager
                 return;
             }
 
-            var hazard = simulation.Sample(transform.position);
+            // DisasterSimulation is authored in Weather Tabletop Island local
+            // coordinates. In MR this landmark is physically translated and
+            // scaled with that island, so its scene-space position is meters,
+            // not a valid simulation sample coordinate.
+            var hazard = simulation.Sample(GetGameplayPosition());
             var intensity = motion == AngeEnvironmentalMotion.WindRotor
                 ? Mathf.Clamp01(hazard.Wind)
                 : Mathf.Clamp01(hazard.Flood * 1.35f + hazard.Moisture * 0.3f);
             var speed = Mathf.Lerp(idleDegreesPerSecond, maximumDegreesPerSecond, intensity);
             rotor.Rotate(localAxis, speed * Time.deltaTime, Space.Self);
+        }
+
+        private Vector3 GetGameplayPosition()
+        {
+            if (world == null)
+            {
+                world = FindFirstObjectByType<WorldBuilder>();
+            }
+
+            return world != null ? world.GetGameplayPosition(transform) : transform.position;
         }
     }
 }

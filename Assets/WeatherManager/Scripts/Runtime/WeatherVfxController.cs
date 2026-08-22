@@ -75,6 +75,12 @@ namespace WeatherManager
 
         [Header("Baked VFX references")]
         [SerializeField] private Transform effectRoot;
+        // Simulation coordinates are authored in the island's local gameplay
+        // space.  In MR the island is reparented and scaled onto a physical
+        // table, while Graphics.RenderMeshInstanced bypasses Transform
+        // inheritance entirely.  Keep this root explicit so every visual
+        // route can use the same gameplay-to-world conversion.
+        [SerializeField] private Transform gameplayRoot;
         [SerializeField] private Camera worldCamera;
         [SerializeField] private Mesh surfaceMesh;
         [SerializeField] private Mesh coneMesh;
@@ -145,6 +151,9 @@ namespace WeatherManager
         private int nextBurstSlot;
         private bool transientPoolsReady;
         private MaterialPropertyBlock propertyBlock;
+        private MrTabletopExperience tabletopExperience;
+        private Vector3 lastGameplayCursorPosition;
+        private bool hasGameplayCursorPosition;
 
         public void Initialize(Transform parent, Camera camera)
         {
@@ -197,6 +206,7 @@ namespace WeatherManager
             weatherParticles ??= FindChildComponent<ParticleSystem>("WeatherPrimary");
             weatherAccentParticles ??= FindChildComponent<ParticleSystem>("WeatherAccent");
             propertyBlock ??= new MaterialPropertyBlock();
+            ResolveGameplayRoot();
             EnsureBakedPrototypes();
             RebindPrototypeAssets();
             EnsureFeedbackObjects();
@@ -213,7 +223,9 @@ namespace WeatherManager
 
         private void OnDisable()
         {
-            if (worldCamera != null && lastCameraShakeOffset.sqrMagnitude > 0f)
+            if (worldCamera != null
+                && !MrRuntimeBridge.IsXrPresentationActive
+                && lastCameraShakeOffset.sqrMagnitude > 0f)
             {
                 worldCamera.transform.position -= lastCameraShakeOffset;
             }
@@ -229,7 +241,9 @@ namespace WeatherManager
             }
 
             cursor.SetActive(!casting);
-            cursor.transform.position = position + Vector3.up * 0.025f;
+            SetGameplayPosition(cursor.transform, position + Vector3.up * 0.025f);
+            lastGameplayCursorPosition = position;
+            hasGameplayCursorPosition = true;
             cursorValid = valid;
             castCharge = 0f;
             cursorBaseScale = new Vector3(radius * 2f, 0.04f, radius * 2f);
@@ -292,10 +306,12 @@ namespace WeatherManager
                 }
             }
 
-            if (weatherParticles != null) weatherParticles.transform.position = activeCast.Center;
-            if (weatherAccentParticles != null) weatherAccentParticles.transform.position = activeCast.Center;
+            if (weatherParticles != null) SetGameplayPosition(weatherParticles.transform, activeCast.Center);
+            if (weatherAccentParticles != null) SetGameplayPosition(weatherAccentParticles.transform, activeCast.Center);
             cursor.SetActive(true);
-            cursor.transform.position = activeCast.Center + Vector3.up * 0.03f;
+            SetGameplayPosition(cursor.transform, activeCast.Center + Vector3.up * 0.03f);
+            lastGameplayCursorPosition = activeCast.Center;
+            hasGameplayCursorPosition = true;
             cursorValid = true;
             castCharge = Mathf.Clamp01(activeCast.HoldSeconds / 3f);
             cursorBaseScale = new Vector3(activeCast.Radius * 2f, 0.04f, activeCast.Radius * 2f);
@@ -333,47 +349,47 @@ namespace WeatherManager
                 if (cell.Water > 0.035f && waterCount < waterMatrices.Length)
                 {
                     var scale = new Vector3(0.92f, 1f, 0.92f) * (0.86f + cell.Water * 0.18f);
-                    waterMatrices[waterCount++] = Matrix4x4.TRS(
+                    waterMatrices[waterCount++] = GameplayToWorldMatrix(Matrix4x4.TRS(
                         cell.Position + Vector3.up * (0.035f + cell.Water * 0.045f),
                         Quaternion.identity,
-                        scale);
+                        scale));
 
                     if ((index & 1) == 0 && rippleCount < rippleMatrices.Length)
                     {
                         var phase = Mathf.Repeat(visualTime * 0.7f + index * 0.173f, 1f);
                         var rippleScale = Mathf.Lerp(0.28f, 0.92f, phase) * (0.72f + cell.Water * 0.38f);
-                        rippleMatrices[rippleCount++] = Matrix4x4.TRS(
+                        rippleMatrices[rippleCount++] = GameplayToWorldMatrix(Matrix4x4.TRS(
                             cell.Position + Vector3.up * (0.085f + cell.Water * 0.045f),
                             Quaternion.Euler(0f, index * 23f, 0f),
-                            new Vector3(rippleScale, 0.018f, rippleScale));
+                            new Vector3(rippleScale, 0.018f, rippleScale)));
                     }
                 }
                 if (cell.Snow > 0.035f && snowCount < snowMatrices.Length)
                 {
                     var scale = new Vector3(0.9f, 1f, 0.9f) * (0.82f + cell.Snow * 0.2f);
-                    snowMatrices[snowCount++] = Matrix4x4.TRS(
+                    snowMatrices[snowCount++] = GameplayToWorldMatrix(Matrix4x4.TRS(
                         cell.Position + Vector3.up * (0.05f + cell.Snow * 0.08f),
                         Quaternion.identity,
-                        scale);
+                        scale));
                 }
                 if (cell.Scorch > 0.045f && scorchCount < scorchMatrices.Length)
                 {
-                    scorchMatrices[scorchCount++] = Matrix4x4.TRS(
+                    scorchMatrices[scorchCount++] = GameplayToWorldMatrix(Matrix4x4.TRS(
                         cell.Position + Vector3.up * 0.018f,
                         Quaternion.Euler(0f, index * 19f, 0f),
-                        new Vector3(0.76f + cell.Scorch * 0.28f, 1f, 0.76f + cell.Scorch * 0.28f));
+                        new Vector3(0.76f + cell.Scorch * 0.28f, 1f, 0.76f + cell.Scorch * 0.28f)));
                 }
                 if (cell.Fire > 0.07f && fireCount < fireMatrices.Length)
                 {
                     var pulse = 0.78f + Mathf.Sin(visualTime * 8f + index) * 0.12f;
-                    fireMatrices[fireCount] = Matrix4x4.TRS(
+                    fireMatrices[fireCount] = GameplayToWorldMatrix(Matrix4x4.TRS(
                         cell.Position + Vector3.up * (0.38f + cell.Fire * 0.25f),
                         Quaternion.Euler(0f, visualTime * 110f + index * 31f, 0f),
-                        new Vector3(0.25f, 0.65f + cell.Fire * 0.45f, 0.25f) * pulse);
-                    smokeMatrices[fireCount] = Matrix4x4.TRS(
+                        new Vector3(0.25f, 0.65f + cell.Fire * 0.45f, 0.25f) * pulse));
+                    smokeMatrices[fireCount] = GameplayToWorldMatrix(Matrix4x4.TRS(
                         cell.Position + Vector3.up * (1.05f + cell.Fire * 0.55f),
                         Quaternion.Euler(0f, -visualTime * 30f + index * 17f, 0f),
-                        Vector3.one * (0.28f + cell.Fire * 0.25f));
+                        Vector3.one * (0.28f + cell.Fire * 0.25f)));
                     fireCount++;
                     if (!hasEmbers && cell.Fire > 0.34f)
                     {
@@ -398,10 +414,10 @@ namespace WeatherManager
                 {
                     var height = 0.28f + ring * 0.43f;
                     var width = 0.42f + ring * 0.18f + tornado.Strength * 0.12f;
-                    var matrix = Matrix4x4.TRS(
+                    var matrix = GameplayToWorldMatrix(Matrix4x4.TRS(
                         tornado.Position + Vector3.up * height,
                         Quaternion.Euler(0f, visualTime * (170f + ring * 12f) + ring * 27f, 0f),
-                        new Vector3(width, 0.7f, width));
+                        new Vector3(width, 0.7f, width)));
                     if (tornado.IsFireTornado)
                     {
                         if (fireTornadoCount < fireTornadoMatrices.Length)
@@ -422,10 +438,10 @@ namespace WeatherManager
                             Mathf.Cos(orbit) * debrisRadius,
                             height + 0.14f,
                             Mathf.Sin(orbit) * debrisRadius);
-                        debrisMatrices[debrisCount++] = Matrix4x4.TRS(
+                        debrisMatrices[debrisCount++] = GameplayToWorldMatrix(Matrix4x4.TRS(
                             debrisPosition,
                             Quaternion.Euler(orbit * Mathf.Rad2Deg, visualTime * 210f, ring * 17f),
-                            Vector3.one * (0.07f + tornado.Strength * 0.035f));
+                            Vector3.one * (0.07f + tornado.Strength * 0.035f)));
                     }
                 }
             }
@@ -627,7 +643,9 @@ namespace WeatherManager
             skyFlash = 0f;
             cameraShakeTime = 0f;
             cameraShakeStrength = 0f;
-            if (worldCamera != null && lastCameraShakeOffset.sqrMagnitude > 0f)
+            if (worldCamera != null
+                && !MrRuntimeBridge.IsXrPresentationActive
+                && lastCameraShakeOffset.sqrMagnitude > 0f)
             {
                 worldCamera.transform.position -= lastCameraShakeOffset;
             }
@@ -636,6 +654,7 @@ namespace WeatherManager
             steamCooldown = 0f;
             emberCooldown = 0f;
             castCharge = 0f;
+            hasGameplayCursorPosition = false;
             if (cursor != null) cursor.SetActive(false);
             if (castTrajectory != null) castTrajectory.enabled = false;
             if (weatherParticles != null)
@@ -696,8 +715,8 @@ namespace WeatherManager
             castTrajectory.widthMultiplier = Mathf.Lerp(0.045f, 0.12f, castCharge);
             castTrajectory.startColor = color;
             castTrajectory.endColor = WithAlpha(color, 0.06f);
-            castTrajectory.SetPosition(0, start);
-            castTrajectory.SetPosition(1, start - direction * length);
+            castTrajectory.SetPosition(0, GameplayToLocalPosition(castTrajectory.transform, start));
+            castTrajectory.SetPosition(1, GameplayToLocalPosition(castTrajectory.transform, start - direction * length));
         }
 
         private void EnsureFeedbackObjects()
@@ -719,7 +738,10 @@ namespace WeatherManager
                 trajectoryObject.transform.SetParent(effectRoot, false);
                 castTrajectory = trajectoryObject.AddComponent<LineRenderer>();
             }
-            castTrajectory.useWorldSpace = true;
+            // The trajectory belongs to the tabletop just like the cursor. A
+            // local line prevents it from being left in the old global world
+            // position when the physical table anchor changes.
+            castTrajectory.useWorldSpace = false;
             castTrajectory.positionCount = 2;
             castTrajectory.numCapVertices = 2;
             castTrajectory.numCornerVertices = 2;
@@ -961,7 +983,7 @@ namespace WeatherManager
 
         private void ActivateLightning(LightningSlot slot, Vector3 position)
         {
-            slot.Root.transform.position = position;
+            SetGameplayPosition(slot.Root.transform, position);
             slot.Root.SetActive(true);
             slot.Active = true;
             slot.Age = 0f;
@@ -987,7 +1009,7 @@ namespace WeatherManager
 
         private void ActivateCollapse(CollapseSlot slot, Vector3 position, float radius, bool snowCollapse)
         {
-            slot.Root.transform.position = position;
+            SetGameplayPosition(slot.Root.transform, position);
             slot.Root.SetActive(true);
             slot.Active = true;
             slot.Age = 0f;
@@ -1056,12 +1078,17 @@ namespace WeatherManager
                 blackoutBeacon.intensity = Mathf.MoveTowards(blackoutBeacon.intensity, target, delta * 0.75f);
             }
 
-            if (worldCamera != null && lastCameraShakeOffset.sqrMagnitude > 0f)
+            var canMoveCamera = worldCamera != null && !MrRuntimeBridge.IsXrPresentationActive;
+            if (canMoveCamera && lastCameraShakeOffset.sqrMagnitude > 0f)
             {
                 worldCamera.transform.position -= lastCameraShakeOffset;
                 lastCameraShakeOffset = Vector3.zero;
             }
-            if (worldCamera != null && cameraShakeTime > 0f)
+            else if (!canMoveCamera)
+            {
+                lastCameraShakeOffset = Vector3.zero;
+            }
+            if (canMoveCamera && cameraShakeTime > 0f)
             {
                 cameraShakeTime = Mathf.Max(0f, cameraShakeTime - delta);
                 var falloff = Mathf.Clamp01(cameraShakeTime / 0.32f);
@@ -1069,11 +1096,16 @@ namespace WeatherManager
                 worldCamera.transform.position += lastCameraShakeOffset;
                 if (cameraShakeTime <= 0f) cameraShakeStrength = 0f;
             }
+            else if (!canMoveCamera)
+            {
+                cameraShakeTime = 0f;
+                cameraShakeStrength = 0f;
+            }
         }
 
         private void EmitCastingFeedback()
         {
-            var position = cursor != null ? cursor.transform.position : effectRoot.position;
+            var position = hasGameplayCursorPosition ? lastGameplayCursorPosition : Vector3.zero;
             switch (activeWeather)
             {
                 case WeatherType.Wind:
@@ -1107,7 +1139,7 @@ namespace WeatherManager
             }
             var slot = burstPool[nextBurstSlot];
             nextBurstSlot = (nextBurstSlot + 1) % burstPool.Length;
-            slot.Root.position = position;
+            SetGameplayPosition(slot.Root, position);
             slot.Particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             EmitParticles(slot.Particles, kind, count);
         }
@@ -1422,7 +1454,11 @@ namespace WeatherManager
             var main = system.main;
             main.loop = true;
             main.playOnAwake = false;
-            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            // Weather particle emitters are descendants of the tabletop.  Use
+            // local simulation so emitted particles follow both an MR table
+            // placement and its real-world scale rather than remaining at the
+            // original global Unity origin.
+            main.simulationSpace = ParticleSystemSimulationSpace.Local;
             main.maxParticles = accent ? 280 : 900;
             main.startLifetime = type switch
             {
@@ -1467,7 +1503,7 @@ namespace WeatherManager
 
             var velocity = system.velocityOverLifetime;
             velocity.enabled = true;
-            velocity.space = ParticleSystemSimulationSpace.World;
+            velocity.space = ParticleSystemSimulationSpace.Local;
             switch (type)
             {
                 case WeatherType.Rain:
@@ -1524,13 +1560,93 @@ namespace WeatherManager
                 shadowCastingMode = ShadowCastingMode.Off,
                 receiveShadows = false,
                 layer = gameObject.layer,
-                worldBounds = new Bounds(Vector3.zero, new Vector3(120f, 40f, 100f))
+                worldBounds = GameplayWorldBounds(new Bounds(Vector3.zero, new Vector3(120f, 40f, 100f)))
             };
             for (var offset = 0; offset < count; offset += 1023)
             {
                 var batchCount = Mathf.Min(1023, count - offset);
                 Graphics.RenderMeshInstanced(parameters, mesh, 0, matrices, batchCount, offset);
             }
+        }
+
+        private void ResolveGameplayRoot()
+        {
+            if (gameplayRoot != null)
+            {
+                return;
+            }
+
+            if (tabletopExperience == null)
+            {
+                tabletopExperience = FindFirstObjectByType<MrTabletopExperience>();
+            }
+            if (tabletopExperience != null && tabletopExperience.TabletopIsland != null)
+            {
+                gameplayRoot = tabletopExperience.TabletopIsland;
+                return;
+            }
+
+            // Dynamic/editor fallback: find the authored island in the
+            // hierarchy rather than assuming the VFX root is at world origin.
+            for (var current = effectRoot; current != null; current = current.parent)
+            {
+                if (current.name == "Weather Tabletop Island")
+                {
+                    gameplayRoot = current;
+                    return;
+                }
+            }
+        }
+
+        private Vector3 GameplayToWorldPoint(Vector3 gameplayPosition)
+        {
+            ResolveGameplayRoot();
+            return gameplayRoot != null
+                ? gameplayRoot.TransformPoint(gameplayPosition)
+                : gameplayPosition;
+        }
+
+        private Vector3 GameplayToLocalPosition(Transform target, Vector3 gameplayPosition)
+        {
+            if (target == null)
+            {
+                return gameplayPosition;
+            }
+            return target.InverseTransformPoint(GameplayToWorldPoint(gameplayPosition));
+        }
+
+        private void SetGameplayPosition(Transform target, Vector3 gameplayPosition)
+        {
+            if (target == null)
+            {
+                return;
+            }
+            target.position = GameplayToWorldPoint(gameplayPosition);
+        }
+
+        private Matrix4x4 GameplayToWorldMatrix(Matrix4x4 gameplayMatrix)
+        {
+            ResolveGameplayRoot();
+            return gameplayRoot != null
+                ? gameplayRoot.localToWorldMatrix * gameplayMatrix
+                : gameplayMatrix;
+        }
+
+        private Bounds GameplayWorldBounds(Bounds gameplayBounds)
+        {
+            ResolveGameplayRoot();
+            if (gameplayRoot == null)
+            {
+                return gameplayBounds;
+            }
+
+            var matrix = gameplayRoot.localToWorldMatrix;
+            var localExtents = gameplayBounds.extents;
+            var worldExtents = new Vector3(
+                Mathf.Abs(matrix.m00) * localExtents.x + Mathf.Abs(matrix.m01) * localExtents.y + Mathf.Abs(matrix.m02) * localExtents.z,
+                Mathf.Abs(matrix.m10) * localExtents.x + Mathf.Abs(matrix.m11) * localExtents.y + Mathf.Abs(matrix.m12) * localExtents.z,
+                Mathf.Abs(matrix.m20) * localExtents.x + Mathf.Abs(matrix.m21) * localExtents.y + Mathf.Abs(matrix.m22) * localExtents.z);
+            return new Bounds(matrix.MultiplyPoint3x4(gameplayBounds.center), worldExtents * 2f);
         }
 
         private static Material CreateMaterial(string name, Color color, bool transparent, bool particle = false)

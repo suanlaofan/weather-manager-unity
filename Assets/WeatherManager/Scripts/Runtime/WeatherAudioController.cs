@@ -11,6 +11,9 @@ namespace WeatherManager
 
         [Header("Baked audio pool")]
         [SerializeField] private Transform audioRoot;
+        // Simulation emits tabletop-local coordinates.  Source placement must
+        // be converted through the island when MR moves/scales the sandbox.
+        [SerializeField] private Transform gameplayRoot;
         [SerializeField] private AudioSource weatherSource;
         [SerializeField] private List<AudioSource> oneShotSources = new List<AudioSource>(OneShotPoolSize);
         private readonly Dictionary<string, float> cueTimes = new Dictionary<string, float>();
@@ -36,6 +39,7 @@ namespace WeatherManager
         private int nextSource;
         private WeatherType activeWeather;
         private bool weatherActive;
+        private MrTabletopExperience tabletopExperience;
 
         public bool Enabled => enabledAudio;
 
@@ -74,6 +78,7 @@ namespace WeatherManager
             }
 
             EnsureProceduralClips();
+            ResolveGameplayRoot();
         }
 
         public void PrepareBakedScene(Transform parent, Transform listener)
@@ -96,6 +101,7 @@ namespace WeatherManager
                 if (sources[index] != weatherSource) oneShotSources.Add(sources[index]);
             }
             EnsureProceduralClips();
+            ResolveGameplayRoot();
             nextSource = 0;
             if (Application.isPlaying) ResetAll();
         }
@@ -138,7 +144,7 @@ namespace WeatherManager
             {
                 return;
             }
-            weatherSource.transform.position = position + Vector3.up * 1.2f;
+            SetGameplayPosition(weatherSource.transform, position + Vector3.up * 1.2f);
             weatherSource.clip = weatherClip;
             weatherSource.pitch = WeatherPitch(type);
             targetWeatherVolume = enabledAudio ? WeatherVolume(type) : 0f;
@@ -157,7 +163,7 @@ namespace WeatherManager
         {
             if (weatherSource != null)
             {
-                weatherSource.transform.position = position + Vector3.up * 1.2f;
+                SetGameplayPosition(weatherSource.transform, position + Vector3.up * 1.2f);
             }
         }
 
@@ -361,6 +367,45 @@ namespace WeatherManager
             return null;
         }
 
+        private void ResolveGameplayRoot()
+        {
+            if (gameplayRoot != null)
+            {
+                return;
+            }
+
+            if (tabletopExperience == null)
+            {
+                tabletopExperience = FindFirstObjectByType<MrTabletopExperience>();
+            }
+            if (tabletopExperience != null && tabletopExperience.TabletopIsland != null)
+            {
+                gameplayRoot = tabletopExperience.TabletopIsland;
+                return;
+            }
+
+            for (var current = audioRoot; current != null; current = current.parent)
+            {
+                if (current.name == "Weather Tabletop Island")
+                {
+                    gameplayRoot = current;
+                    return;
+                }
+            }
+        }
+
+        private void SetGameplayPosition(Transform target, Vector3 gameplayPosition)
+        {
+            if (target == null)
+            {
+                return;
+            }
+            ResolveGameplayRoot();
+            target.position = gameplayRoot != null
+                ? gameplayRoot.TransformPoint(gameplayPosition)
+                : gameplayPosition;
+        }
+
         private void PlaySpatial(string cue, AudioClip clip, Vector3 position, float volume, float cooldown, float pitch)
         {
             if (!CanPlay(cue, cooldown) || clip == null)
@@ -368,7 +413,7 @@ namespace WeatherManager
                 return;
             }
             var source = NextSource();
-            source.transform.position = position;
+            SetGameplayPosition(source.transform, position);
             source.spatialBlend = 0.58f;
             source.pitch = pitch;
             source.PlayOneShot(clip, volume);

@@ -1043,8 +1043,26 @@ namespace WeatherManager.Editor
                 {
                     return roots[index].transform;
                 }
+
+                var nested = FindDescendant(roots[index].transform, name);
+                if (nested != null)
+                {
+                    return nested;
+                }
             }
             throw new InvalidOperationException($"Scene root {name} is missing.");
+        }
+
+        private static Transform FindDescendant(Transform parent, string name)
+        {
+            for (var index = 0; index < parent.childCount; index++)
+            {
+                var child = parent.GetChild(index);
+                if (child.name == name) return child;
+                var nested = FindDescendant(child, name);
+                if (nested != null) return nested;
+            }
+            return null;
         }
 
         private static bool IsUnderNamedChild(Transform candidate, Transform root, string childName)

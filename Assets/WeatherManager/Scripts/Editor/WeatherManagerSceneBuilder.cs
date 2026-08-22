@@ -9,6 +9,9 @@ using UnityEngine.EventSystems;
 using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using UnityEngine.SpatialTracking;
+using Unity.XR.CoreUtils;
+using Unity.XR.PXR;
 
 namespace WeatherManager.Editor
 {
@@ -33,20 +36,61 @@ namespace WeatherManager.Editor
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             scene.name = "WeatherManager";
 
-            var environmentRoot = CreateRoot("Environment");
-            var buildingsRoot = CreateRoot("Buildings");
-            var vegetationRoot = CreateRoot("Vegetation");
-            var residentsRoot = CreateRoot("Residents");
-            var gameplayRoot = CreateRoot("GameplaySystems");
-            var vfxPoolsRoot = CreateRoot("VFXPools");
-            var lightingRoot = CreateRoot("Lighting");
-            var uiRoot = CreateRoot("UI");
-            var cameraRoot = CreateRoot("Main Camera");
+            // The scene stays fully editable in the desktop editor, while this
+            // hierarchy becomes a physical tabletop only once PICO has started
+            // an active XR session.  It prevents the old 2D app-window layout.
+            var mrRigRoot = CreateRoot("MR Rig");
+            var xrOrigin = mrRigRoot.AddComponent<XROrigin>();
+            xrOrigin.Origin = mrRigRoot;
+            xrOrigin.RequestedTrackingOriginMode = XROrigin.TrackingOriginMode.Floor;
+            var pxrManager = mrRigRoot.AddComponent<PXR_Manager>();
+            // MRC is an external-camera compositor path, distinct from headset
+            // video see-through.  Disable it in the authored scene so it cannot
+            // compete with the HMD/XR view at startup.
+            pxrManager.openMRC = false;
+            var cameraOffset = CreateChild(mrRigRoot.transform, "Camera Offset");
+            cameraOffset.transform.localPosition = new Vector3(0f, 1.62f, 0f);
+            xrOrigin.CameraFloorOffsetObject = cameraOffset;
+
+            var tabletopAnchor = CreateChild(mrRigRoot.transform, "Weather Tabletop Anchor");
+            var tabletopRoot = CreateChild(tabletopAnchor.transform, "Weather Tabletop Island");
+            var environmentRoot = CreateChild(tabletopRoot.transform, "Environment");
+            var buildingsRoot = CreateChild(tabletopRoot.transform, "Buildings");
+            var vegetationRoot = CreateChild(tabletopRoot.transform, "Vegetation");
+            var residentsRoot = CreateChild(tabletopRoot.transform, "Residents");
+            var gameplayRoot = CreateChild(tabletopRoot.transform, "GameplaySystems");
+            var vfxPoolsRoot = CreateChild(tabletopRoot.transform, "VFXPools");
+            var lightingRoot = CreateChild(tabletopRoot.transform, "Lighting");
+            var cameraRoot = CreateChild(cameraOffset.transform, "Main Camera");
+            // Serialize the dashboard under the HMD now, so the editable scene
+            // makes the intended head-locked ownership obvious. Desktop uses a
+            // ScreenSpaceOverlay canvas, while MR switches the same canvas to a
+            // fixed-size World Space panel.
+            var dashboardRoot = CreateChild(cameraRoot.transform, "Head Locked UI");
+            dashboardRoot.transform.localPosition = new Vector3(0f, -0.16f, 1.12f);
+            var uiRoot = CreateChild(dashboardRoot.transform, "UI");
+
+            var leftController = BuildControllerRay(mrRigRoot.transform, "Left Controller", false);
+            var rightController = BuildControllerRay(mrRigRoot.transform, "Right Controller", true);
 
             var worldCamera = BuildCamera(cameraRoot);
+            xrOrigin.Camera = worldCamera;
+            ConfigureTrackedPoseDriver(
+                worldCamera.gameObject,
+                TrackedPoseDriver.DeviceType.GenericXRDevice,
+                TrackedPoseDriver.TrackedPose.Center);
+            ConfigureTrackedPoseDriver(
+                leftController,
+                TrackedPoseDriver.DeviceType.GenericXRController,
+                TrackedPoseDriver.TrackedPose.LeftPose);
+            ConfigureTrackedPoseDriver(
+                rightController,
+                TrackedPoseDriver.DeviceType.GenericXRController,
+                TrackedPoseDriver.TrackedPose.RightPose);
             BuildLighting(lightingRoot, out var sun, out var moonFill);
 
             var manager = gameplayRoot.AddComponent<GameManager>();
+            var mrTabletop = mrRigRoot.AddComponent<MrTabletopExperience>();
             var world = gameplayRoot.AddComponent<WorldBuilder>();
             var simulation = gameplayRoot.AddComponent<DisasterSimulation>();
             var casting = gameplayRoot.AddComponent<WeatherCastingController>();
@@ -71,6 +115,10 @@ namespace WeatherManager.Editor
             audio.PrepareBakedScene(gameplayRoot.transform, worldCamera.transform);
             ui.PrepareBakedScene(uiRoot.transform, manager);
             NormalizeEventSystems(uiRoot.transform);
+            // Serialize the tracked-controller UI route into the authored
+            // scene now; desktop fallback keeps this component disabled until
+            // MrTabletopExperience switches the Canvas to World Space.
+            ui.PrepareSpatialInput(mrRigRoot.transform);
 
             manager.ConfigureSceneReferences(
                 world,
@@ -84,6 +132,7 @@ namespace WeatherManager.Editor
                 sun,
                 moonFill,
                 gameplayRoot.transform);
+            mrTabletop.Configure(tabletopRoot.transform, dashboardRoot.transform, worldCamera, ui);
 
             AssetizeSceneResources(scene);
             var angeReport = AngeAssetReplacement.ApplyToScene(scene, world, false);
@@ -598,17 +647,68 @@ namespace WeatherManager.Editor
             return root;
         }
 
+        private static GameObject CreateChild(Transform parent, string name)
+        {
+            var child = new GameObject(name);
+            child.transform.SetParent(parent, false);
+            return child;
+        }
+
+        private static GameObject BuildControllerRay(Transform parent, string name, bool rightHand)
+        {
+            var controller = CreateChild(parent, name);
+            controller.transform.localPosition = rightHand
+                ? new Vector3(0.24f, 1.28f, 0.28f)
+                : new Vector3(-0.24f, 1.28f, 0.28f);
+            var ray = CreateChild(controller.transform, rightHand ? "Right Hand Ray" : "Left Hand Ray");
+            var line = ray.AddComponent<LineRenderer>();
+            line.useWorldSpace = false;
+            line.positionCount = 2;
+            line.SetPositions(new[] { Vector3.zero, Vector3.forward * 1.5f });
+            line.startWidth = 0.004f;
+            line.endWidth = 0.0015f;
+            line.material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            line.startColor = rightHand ? new Color(0.2f, 0.82f, 1f, 0.85f) : new Color(0.45f, 0.8f, 1f, 0.6f);
+            line.endColor = new Color(1f, 1f, 1f, 0f);
+            return controller;
+        }
+
+        private static void ConfigureTrackedPoseDriver(
+            GameObject target,
+            TrackedPoseDriver.DeviceType deviceType,
+            TrackedPoseDriver.TrackedPose pose)
+        {
+            var driver = target.AddComponent<TrackedPoseDriver>();
+            if (!driver.SetPoseSource(deviceType, pose))
+            {
+                throw new BuildFailedException(
+                    $"Unable to configure tracked pose for {target.name}: {deviceType}/{pose}.");
+            }
+
+            driver.trackingType = TrackedPoseDriver.TrackingType.RotationAndPosition;
+            driver.updateType = TrackedPoseDriver.UpdateType.UpdateAndBeforeRender;
+            // Keep the authored desktop pose only as a no-device fallback.  When
+            // PICO has an active session, the device pose directly drives this node.
+            driver.UseRelativeTransform = false;
+        }
+
         private static Camera BuildCamera(GameObject cameraRoot)
         {
             cameraRoot.tag = "MainCamera";
-            cameraRoot.transform.position = new Vector3(0f, 56f, -67f);
-            cameraRoot.transform.rotation = Quaternion.Euler(43f, 0f, 0f);
+            // XR camera transforms begin at the neutral tracking origin. The
+            // desktop overview is applied later by CameraController only for
+            // a confirmed no-XR fallback. Authoring the old overview here
+            // made the first PICO tabletop anchor inherit (0,56,-67) and
+            // disappear outside the headset view.
+            cameraRoot.transform.localPosition = Vector3.zero;
+            cameraRoot.transform.localRotation = Quaternion.identity;
             var camera = cameraRoot.AddComponent<Camera>();
             camera.fieldOfView = 45f;
             camera.nearClipPlane = 0.1f;
             camera.farClipPlane = 280f;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.48f, 0.76f, 0.86f);
+            camera.rect = new Rect(0f, 0f, 1f, 1f);
             camera.allowHDR = true;
             camera.allowMSAA = true;
             cameraRoot.AddComponent<AudioListener>();

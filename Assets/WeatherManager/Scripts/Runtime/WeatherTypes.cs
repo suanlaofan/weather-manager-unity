@@ -264,6 +264,14 @@ namespace WeatherManager
         public Transform Root;
         public Renderer[] Renderers = Array.Empty<Renderer>();
         public Color[] BaseColors = Array.Empty<Color>();
+        // Gameplay state is authored in the tabletop island's local coordinate
+        // system.  A PICO MR session moves and scales that island into physical
+        // metres, so these local values are the only safe transform baseline
+        // for Reset.  The legacy InitialPosition/InitialRotation remain the
+        // gameplay-space values used by simulation code and old baked scenes.
+        public Vector3 InitialLocalPosition;
+        public Quaternion InitialLocalRotation = Quaternion.identity;
+        public bool HasLocalTransformBaseline;
         public Vector3 InitialPosition;
         public Quaternion InitialRotation;
         public Vector3 InitialScale;

@@ -17,6 +17,11 @@ namespace WeatherManager
         [SerializeField] private Transform leftLeg;
         [SerializeField] private Transform rightLeg;
         [SerializeField] private LowPolyTerrainGenerator terrain;
+        // Residents simulate in the authored tabletop coordinate system.  The
+        // PICO MR presentation moves and scales that tabletop into metres, so
+        // reading Transform.position directly would make Reset and movement
+        // escape the island after MR activates.
+        private WorldBuilder world;
         [SerializeField] private Renderer[] renderers = Array.Empty<Renderer>();
         [SerializeField] private Color[] baseColors = Array.Empty<Color>();
         [SerializeField] private Vector3 initialPosition;
@@ -55,6 +60,7 @@ namespace WeatherManager
 
         public void InitializeBakedRuntime()
         {
+            ResolveWorld();
             if (terrain == null)
             {
                 terrain = FindFirstObjectByType<LowPolyTerrainGenerator>(FindObjectsInactive.Include);
@@ -83,10 +89,10 @@ namespace WeatherManager
         public float SnapToTerrain()
         {
             if (terrain == null) return 0f;
-            var before = transform.position.y;
-            var position = transform.position;
+            var position = GetGameplayPosition();
+            var before = position.y;
             position.y = terrain.SampleHeight(position) + 0.09f;
-            transform.position = position;
+            SetGameplayPosition(position);
             homePosition.y = position.y;
             initialPosition.y = position.y;
             wanderTarget.y = position.y;
@@ -121,7 +127,7 @@ namespace WeatherManager
             CaptureBaseColors();
 
             initialPosition = home;
-            initialRotation = transform.rotation;
+            initialRotation = GetGameplayRotation();
             initialScale = transform.localScale;
             bodyBasePosition = body != null ? body.localPosition : Vector3.zero;
             headBasePosition = head != null ? head.localPosition : Vector3.zero;
@@ -148,7 +154,7 @@ namespace WeatherManager
                 return;
             }
 
-            var hazard = simulation.Sample(transform.position);
+            var hazard = simulation.Sample(GetGameplayPosition());
             ApplyHazard(delta, hazard);
             if (health <= 0f)
             {
@@ -181,8 +187,8 @@ namespace WeatherManager
             visualLean = 0f;
             randomState = InitialRandomState(agentId);
             state = ResidentLifeState.Calm;
-            transform.position = initialPosition;
-            transform.rotation = initialRotation;
+            SetGameplayPosition(initialPosition);
+            SetGameplayRotation(initialRotation);
             transform.localScale = initialScale;
             deadRotation = initialRotation;
             if (body != null) body.localPosition = bodyBasePosition;
@@ -231,7 +237,7 @@ namespace WeatherManager
             state = nextState;
             if (State == ResidentLifeState.Dead)
             {
-                var yaw = transform.eulerAngles.y;
+                var yaw = GetGameplayRotation().eulerAngles.y;
                 var fallDirection = (agentId & 1) == 0 ? 88f : -88f;
                 deadRotation = Quaternion.Euler(0f, yaw, fallDirection);
             }
@@ -241,6 +247,7 @@ namespace WeatherManager
 
         private void Move(float delta, HazardSample hazard)
         {
+            var currentPosition = GetGameplayPosition();
             Vector3 direction;
             float speed;
             if (State == ResidentLifeState.Fleeing || (State == ResidentLifeState.Injured && hazard.Threat > 0.08f))
@@ -258,12 +265,12 @@ namespace WeatherManager
             else
             {
                 wanderTimer -= delta;
-                var toTarget = wanderTarget - transform.position;
+                var toTarget = wanderTarget - currentPosition;
                 toTarget.y = 0f;
                 if (wanderTimer <= 0f || toTarget.sqrMagnitude < 0.18f)
                 {
                     PickWanderTarget();
-                    toTarget = wanderTarget - transform.position;
+                    toTarget = wanderTarget - currentPosition;
                     toTarget.y = 0f;
                 }
 
@@ -271,16 +278,19 @@ namespace WeatherManager
                 speed = State == ResidentLifeState.Injured ? 0.44f : 0.66f;
             }
 
-            var nextPosition = transform.position + direction * (speed * delta);
+            var nextPosition = currentPosition + direction * (speed * delta);
             nextPosition.y = terrain != null ? terrain.SampleHeight(nextPosition) + 0.09f : initialPosition.y;
             nextPosition = ClampToIsland(nextPosition, 0.91f);
-            transform.position = nextPosition;
+            SetGameplayPosition(nextPosition);
             if (direction.sqrMagnitude > 0.001f)
             {
                 var lean = State == ResidentLifeState.Injured ? ((agentId & 1) == 0 ? 7f : -7f) : 0f;
                 visualLean = Mathf.Lerp(visualLean, lean, 1f - Mathf.Exp(-delta * 6f));
                 var targetRotation = Quaternion.LookRotation(direction, Vector3.up) * Quaternion.Euler(0f, 0f, visualLean);
-                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, 1f - Mathf.Exp(-delta * 9f));
+                SetGameplayRotation(Quaternion.Slerp(
+                    GetGameplayRotation(),
+                    targetRotation,
+                    1f - Mathf.Exp(-delta * 9f)));
             }
         }
 
@@ -310,7 +320,10 @@ namespace WeatherManager
 
         private void AnimateDead(float delta)
         {
-            transform.rotation = Quaternion.Slerp(transform.rotation, deadRotation, 1f - Mathf.Exp(-delta * 8f));
+            SetGameplayRotation(Quaternion.Slerp(
+                GetGameplayRotation(),
+                deadRotation,
+                1f - Mathf.Exp(-delta * 8f)));
             if (body != null)
             {
                 body.localPosition = Vector3.Lerp(body.localPosition, bodyBasePosition, 1f - Mathf.Exp(-delta * 8f));
@@ -371,9 +384,9 @@ namespace WeatherManager
             {
                 agentId = transform.GetSiblingIndex() + 1;
             }
-            homePosition = transform.position;
-            initialPosition = transform.position;
-            initialRotation = transform.rotation;
+            homePosition = GetGameplayPosition();
+            initialPosition = homePosition;
+            initialRotation = GetGameplayRotation();
             initialScale = transform.localScale;
             bodyBasePosition = body.localPosition;
             headBasePosition = head.localPosition;
@@ -435,6 +448,56 @@ namespace WeatherManager
             {
                 CaptureBaseColors();
             }
+        }
+
+        private WorldBuilder ResolveWorld()
+        {
+            if (world == null)
+            {
+                world = FindFirstObjectByType<WorldBuilder>(FindObjectsInactive.Include);
+            }
+
+            return world;
+        }
+
+        private Vector3 GetGameplayPosition()
+        {
+            var worldBuilder = ResolveWorld();
+            return worldBuilder != null
+                ? worldBuilder.GetGameplayPosition(transform)
+                : transform.position;
+        }
+
+        private Quaternion GetGameplayRotation()
+        {
+            var worldBuilder = ResolveWorld();
+            return worldBuilder != null
+                ? worldBuilder.GetGameplayRotation(transform)
+                : transform.rotation;
+        }
+
+        private void SetGameplayPosition(Vector3 position)
+        {
+            var worldBuilder = ResolveWorld();
+            if (worldBuilder != null)
+            {
+                worldBuilder.SetGameplayPosition(transform, position);
+                return;
+            }
+
+            transform.position = position;
+        }
+
+        private void SetGameplayRotation(Quaternion rotation)
+        {
+            var worldBuilder = ResolveWorld();
+            if (worldBuilder != null)
+            {
+                worldBuilder.SetGameplayRotation(transform, rotation);
+                return;
+            }
+
+            transform.rotation = rotation;
         }
 
         private static Color ReadRendererColor(Renderer renderer)

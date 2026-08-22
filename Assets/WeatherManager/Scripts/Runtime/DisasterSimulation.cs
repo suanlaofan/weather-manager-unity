@@ -264,7 +264,7 @@ namespace WeatherManager
                 throw new InvalidOperationException("Rain acceptance could not find a building.");
             }
 
-            var center = testBuilding.Position;
+            var center = GameplayPosition(testBuilding);
             var cell = PositionToIndex(center);
             fire[cell] = 0.9f;
             heat[cell] = 0.86f;
@@ -472,7 +472,7 @@ namespace WeatherManager
                 throw new InvalidOperationException("Weather feedback acceptance could not find a building.");
             }
 
-            var center = testBuilding.Position;
+            var center = GameplayPosition(testBuilding);
             var cast = new WeatherCastState(
                 weatherType,
                 center,
@@ -892,7 +892,8 @@ namespace WeatherManager
                     continue;
                 }
 
-                var hazard = Sample(record.Position);
+                var gameplayPosition = GameplayPosition(record);
+                var hazard = Sample(gameplayPosition);
                 if (hazard.Fire > 0.12f && hazard.Flood < 0.16f && hazard.Moisture < 0.58f)
                 {
                     record.Burning = true;
@@ -908,11 +909,11 @@ namespace WeatherManager
                         {
                             chainEventCooldown = 2.4f;
                             var extinguishedBiome = biomeMap != null
-                                ? biomeMap.Sample(record.Position)
+                                ? biomeMap.Sample(gameplayPosition)
                                 : BiomeSample.Default;
-                            vfx?.PlaySteam(record.Position, extinguishedBiome.Type);
-                            audioController?.PlaySteam(record.Position, extinguishedBiome.Type);
-                            AngeHydrantFeedback.NotifyExtinguish(record.Position);
+                            vfx?.PlaySteam(gameplayPosition, extinguishedBiome.Type);
+                            audioController?.PlaySteam(gameplayPosition, extinguishedBiome.Type);
+                            AngeHydrantFeedback.NotifyExtinguish(gameplayPosition);
                             DisasterEvent?.Invoke(LocalizationService.Message("event.rain_extinguished_structure"), WeatherPalette.Rain);
                         }
                     }
@@ -955,22 +956,23 @@ namespace WeatherManager
                 return;
             }
 
-            var hazard = Sample(record.Position);
-            var biome = biomeMap != null ? biomeMap.Sample(record.Position) : BiomeSample.Default;
+            var gameplayPosition = GameplayPosition(record);
+            var hazard = Sample(gameplayPosition);
+            var biome = biomeMap != null ? biomeMap.Sample(gameplayPosition) : BiomeSample.Default;
             var wasBurning = record.Burning;
             var snowCollapse = hazard.Snow > 0.55f;
             record.Destroyed = true;
             record.Burning = false;
             record.Health = 0f;
             world.CollapseDamageable(record);
-            vfx?.PlayCollapse(record.Position, record.Radius, snowCollapse, biome.Type);
+            vfx?.PlayCollapse(gameplayPosition, record.Radius, snowCollapse, biome.Type);
             if (snowCollapse)
             {
-                audioController?.PlaySnowCollapse(record.Position, biome.Type);
+                audioController?.PlaySnowCollapse(gameplayPosition, biome.Type);
             }
             else
             {
-                audioController?.PlayCollapse(record.Position, biome.Type);
+                audioController?.PlayCollapse(gameplayPosition, biome.Type);
             }
             var message = snowCollapse
                 ? LocalizationService.Message("event.collapse_snow", LocalizationService.Biome(biome))
@@ -1011,7 +1013,7 @@ namespace WeatherManager
                     continue;
                 }
 
-                var distanceSquared = (record.Position - center).sqrMagnitude;
+                var distanceSquared = (GameplayPosition(record) - center).sqrMagnitude;
                 if (distanceSquared > radiusSquared)
                 {
                     continue;
@@ -1450,6 +1452,16 @@ namespace WeatherManager
             var clamped = new Vector3(normalized.x * HalfWidth, 0f, normalized.y * HalfDepth);
             clamped.y = SampleGroundHeight(clamped) + 0.08f;
             return clamped;
+        }
+
+        private Vector3 GameplayPosition(DamageableState record)
+        {
+            if (record == null)
+            {
+                return Vector3.zero;
+            }
+
+            return world != null ? world.GetGameplayPosition(record) : record.Position;
         }
     }
 }

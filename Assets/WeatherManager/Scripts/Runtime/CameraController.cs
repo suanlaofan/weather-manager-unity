@@ -14,19 +14,47 @@ namespace WeatherManager
         private float distance = 78f;
         private float shakeTime;
         private float shakeStrength;
+        // Android starts the PICO loader after the scene Awake phase. Do not
+        // briefly put the tracked HMD at the desktop overview while that
+        // handshake is happening; this becomes true only for confirmed
+        // no-XR fallback or for a desktop/editor session.
+        private bool desktopPoseEnabled;
 
         public void Initialize(Camera camera, DisasterSimulation disasterSimulation, UIController uiController)
         {
             controlledCamera = camera;
             simulation = disasterSimulation;
             ui = uiController;
+            desktopPoseEnabled = !MrRuntimeBridge.IsAndroidBuild;
+            if (desktopPoseEnabled)
+            {
+                ResetView();
+            }
+        }
+
+        /// <summary>
+        /// Restores the ordinary orbit view only after an Android run has
+        /// conclusively failed to obtain an XR session. This keeps the
+        /// authored HMD origin neutral during PICO loader startup.
+        /// </summary>
+        public void EnableDesktopFallback()
+        {
+            if (MrRuntimeBridge.IsXrPresentationActive)
+            {
+                return;
+            }
+
+            desktopPoseEnabled = true;
             ResetView();
         }
 
         public void Tick(float unscaledDelta)
         {
             var mouse = Mouse.current;
-            if (mouse == null || controlledCamera == null)
+            if (!desktopPoseEnabled
+                || MrRuntimeBridge.IsXrPresentationActive
+                || mouse == null
+                || controlledCamera == null)
             {
                 return;
             }
@@ -82,7 +110,9 @@ namespace WeatherManager
             distance = 78f;
             shakeTime = 0f;
             shakeStrength = 0f;
-            if (controlledCamera != null)
+            if (desktopPoseEnabled
+                && controlledCamera != null
+                && !MrRuntimeBridge.IsXrPresentationActive)
             {
                 var rotation = Quaternion.Euler(pitch, yaw, 0f);
                 controlledCamera.transform.position = target + rotation * (Vector3.back * distance);
@@ -104,7 +134,9 @@ namespace WeatherManager
             yaw = 0f;
             pitch = 48f;
             ClampTarget();
-            if (controlledCamera == null) return;
+            if (!desktopPoseEnabled
+                || controlledCamera == null
+                || MrRuntimeBridge.IsXrPresentationActive) return;
             var rotation = Quaternion.Euler(pitch, yaw, 0f);
             controlledCamera.transform.position = target + rotation * (Vector3.back * distance);
             controlledCamera.transform.LookAt(target, Vector3.up);

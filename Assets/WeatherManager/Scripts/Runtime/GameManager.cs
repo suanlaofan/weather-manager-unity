@@ -269,13 +269,26 @@ namespace WeatherManager
             var targetMoon = night ? 0.52f : 0f;
             sun.intensity = Mathf.Lerp(sun.intensity, targetSun, 1f - Mathf.Exp(-delta * 2.8f));
             moonFill.intensity = Mathf.Lerp(moonFill.intensity, targetMoon, 1f - Mathf.Exp(-delta * 2.8f));
-            var targetBackground = night
-                ? new Color(0.035f, 0.055f, 0.12f)
-                : new Color(0.48f, 0.76f, 0.86f);
-            worldCamera.backgroundColor = Color.Lerp(
-                worldCamera.backgroundColor,
-                targetBackground,
-                1f - Mathf.Exp(-delta * 2.4f));
+            // A real headset must keep the Unity clear color transparent so
+            // PICO's compositor can show the camera feed behind the island.
+            // The emulator has no physical passthrough buffer, so it keeps the
+            // established blue fallback instead of presenting a misleading
+            // black capture.
+            if (MrRuntimeBridge.IsXrPresentationActive && !MrRuntimeBridge.IsPicoEmulator)
+            {
+                worldCamera.clearFlags = CameraClearFlags.SolidColor;
+                worldCamera.backgroundColor = new Color(0f, 0f, 0f, 0f);
+            }
+            else
+            {
+                var targetBackground = night
+                    ? new Color(0.035f, 0.055f, 0.12f)
+                    : new Color(0.48f, 0.76f, 0.86f);
+                worldCamera.backgroundColor = Color.Lerp(
+                    worldCamera.backgroundColor,
+                    targetBackground,
+                    1f - Mathf.Exp(-delta * 2.4f));
+            }
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = night
                 ? new Color(0.12f, 0.16f, 0.28f)

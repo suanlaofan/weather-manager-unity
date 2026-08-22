@@ -30,6 +30,7 @@ namespace WeatherManager
         private readonly Dictionary<WeatherType, Button> weatherButtons = new Dictionary<WeatherType, Button>();
         private readonly Dictionary<DayPhase, Button> phaseButtons = new Dictionary<DayPhase, Button>();
         private readonly Dictionary<float, Button> speedButtons = new Dictionary<float, Button>();
+        private readonly List<Button> spatialHitTargets = new List<Button>(16);
         private readonly LocalizedMessage[] eventMessages = new LocalizedMessage[EventLogCapacity];
         private readonly ToastSeverity[] eventSeverities = new ToastSeverity[EventLogCapacity];
 
@@ -165,6 +166,183 @@ namespace WeatherManager
             LayoutTopBarControls();
             ApplyLocalizedFont();
             ApplyLocalizedLabels();
+        }
+
+        /// <summary>
+        /// Converts the authored dashboard from a flat overlay into a compact,
+        /// head-locked world-space panel when PICO MR has an active HMD. The
+        /// parent anchor follows the HMD; the canvas remains a fixed physical
+        /// size rather than being stretched to the desktop mirror ratio.
+        /// </summary>
+        public void ConfigureSpatialDashboard(
+            Camera xrCamera,
+            Transform dashboardRoot,
+            Transform xrTrackingOrigin,
+            float metersPerPixel)
+        {
+            if (canvas == null || xrCamera == null || dashboardRoot == null)
+            {
+                return;
+            }
+
+            canvas.renderMode = RenderMode.WorldSpace;
+            canvas.worldCamera = xrCamera;
+            canvas.sortingOrder = 0;
+            var canvasTransform = canvas.transform as RectTransform;
+            canvasTransform.SetParent(dashboardRoot, false);
+            canvasTransform.localPosition = Vector3.zero;
+            canvasTransform.localRotation = Quaternion.identity;
+            canvasTransform.localScale = Vector3.one * Mathf.Clamp(metersPerPixel, 0.0004f, 0.003f);
+            // Explicitly use one logical 16:10 dashboard shape.  The Android
+            // mirror can be portrait-sized, but must never reshape or stretch
+            // the physical head-locked UI seen by either eye.
+            canvasTransform.sizeDelta = new Vector2(1440f, 900f);
+
+            var scaler = canvas.GetComponent<CanvasScaler>();
+            if (scaler != null)
+            {
+                // A ScreenSize-based scaler would use the flat emulator mirror
+                // dimensions. In XR that produces a panel whose apparent shape
+                // changes with the capture window instead of the headset view.
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+                scaler.scaleFactor = 1f;
+            }
+
+            PrepareSpatialInput(xrTrackingOrigin);
+
+            // A normal GraphicRaycaster only understands screen-space mouse
+            // input. PICO controller poses are tracked devices, so the
+            // Input System's matching world-space raycaster is required.
+            var graphicRaycaster = canvas.GetComponent<GraphicRaycaster>();
+            if (graphicRaycaster != null)
+            {
+                // A PICO emulator forwards host mouse input through Unity's
+                // normal UI path.  Retain this raycaster only there so a
+                // desktop click can select a head-locked button and is not
+                // treated as a cast through the panel. Real headsets use the
+                // tracked-device raycaster below exclusively.
+                graphicRaycaster.enabled = MrRuntimeBridge.IsPicoEmulator;
+            }
+            var trackedRaycaster = canvas.GetComponent<TrackedDeviceRaycaster>();
+            if (trackedRaycaster != null) trackedRaycaster.enabled = true;
+            Debug.Log(
+                $"WEATHER_MANAGER_MR_HEAD_LOCKED_UI_READY:renderMode=WorldSpace"
+                + $":metersPerPixel={canvasTransform.localScale.x:0.00000}"
+                + $":canvas={canvasTransform.sizeDelta.x:0}x{canvasTransform.sizeDelta.y:0}");
+        }
+
+        /// <summary>
+        /// Bakes the PICO tracked-device input route into the editable scene
+        /// without changing its desktop overlay presentation. The raycaster is
+        /// switched on only when ConfigureSpatialDashboard enters MR.
+        /// </summary>
+        public void PrepareSpatialInput(Transform xrTrackingOrigin)
+        {
+            if (canvas == null)
+            {
+                return;
+            }
+
+            var trackedRaycaster = canvas.GetComponent<TrackedDeviceRaycaster>();
+            if (trackedRaycaster == null)
+            {
+                trackedRaycaster = canvas.gameObject.AddComponent<TrackedDeviceRaycaster>();
+            }
+            trackedRaycaster.maxDistance = 6f;
+            trackedRaycaster.checkFor3DOcclusion = false;
+            trackedRaycaster.checkFor2DOcclusion = false;
+            trackedRaycaster.enabled = canvas.renderMode == RenderMode.WorldSpace;
+            ConfigureSpatialInputModule(xrTrackingOrigin);
+        }
+
+        /// <summary>
+        /// Lightweight gameplay-side UI occlusion guard. This deliberately
+        /// uses the actual baked Canvas plane rather than EventSystem state so
+        /// a trigger cannot cast weather through a dashboard button while the
+        /// Input System is processing that same controller ray.
+        /// </summary>
+        public bool IsSpatialRayOverDashboard(Ray ray)
+        {
+            if (canvas == null || canvas.renderMode != RenderMode.WorldSpace)
+            {
+                return false;
+            }
+
+            var dashboard = canvas.transform as RectTransform;
+            if (dashboard == null)
+            {
+                return false;
+            }
+
+            // Test in canvas-local coordinates. WorldToScreenPoint here would
+            // make controller UI hit-testing depend on the desktop mirror
+            // projection rather than the actual physical world-space canvas.
+            var plane = new Plane(dashboard.forward, dashboard.position);
+            if (!plane.Raycast(ray, out var distance) || distance < 0f || distance > 6f)
+            {
+                return false;
+            }
+
+            return DashboardContainsInteractiveButton(ray.GetPoint(distance));
+        }
+
+        /// <summary>
+        /// Reliable screen-space guard for the PICO emulator's host mouse or
+        /// Android touch. Unlike EventSystem state, this has no one-frame
+        /// dependency on a spatial pointer module, so a dashboard click can
+        /// never leak through into a weather cast.
+        /// </summary>
+        public bool IsScreenPointerOverDashboard(Vector2 screenPosition)
+        {
+            if (canvas == null || canvas.renderMode != RenderMode.WorldSpace)
+            {
+                return false;
+            }
+
+            if (canvas.worldCamera == null)
+            {
+                return false;
+            }
+
+            // The simulator still supplies a 2D host pointer. Convert it to
+            // the same physical canvas-plane test used by tracked controllers,
+            // rather than asking EventSystem for whichever pointer happened to
+            // be processed last.
+            return IsSpatialRayOverDashboard(canvas.worldCamera.ScreenPointToRay(screenPosition));
+        }
+
+        private bool DashboardContainsInteractiveButton(Vector3 worldPoint)
+        {
+            // A dashboard button must block a cast, but a decorative panel or
+            // empty part of the Canvas must not.  The old root-Canvas test made
+            // an enlarged head-locked UI consume nearly every tabletop click.
+            if (spatialHitTargets.Count == 0)
+            {
+                RefreshSpatialHitTargets();
+            }
+
+            for (var index = 0; index < spatialHitTargets.Count; index++)
+            {
+                var button = spatialHitTargets[index];
+                if (button == null || !button.isActiveAndEnabled || !button.interactable)
+                {
+                    continue;
+                }
+
+                var buttonRect = button.transform as RectTransform;
+                if (buttonRect == null)
+                {
+                    continue;
+                }
+
+                var localPoint = buttonRect.InverseTransformPoint(worldPoint);
+                if (buttonRect.rect.Contains(new Vector2(localPoint.x, localPoint.y)))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public void Refresh(
@@ -428,6 +606,7 @@ namespace WeatherManager
             {
                 soundButtonLabel = soundButton.GetComponentInChildren<Text>(true);
             }
+            RefreshSpatialHitTargets();
             DisableSeasonControls();
             for (var index = 0; index < weatherButtonRefs.Length; index++)
             {
@@ -498,6 +677,39 @@ namespace WeatherManager
             {
                 if (index < speedButtonRefs.Length && speedButtonRefs[index] != null)
                     speedButtons[speeds[index]] = speedButtonRefs[index];
+            }
+        }
+
+        private void RefreshSpatialHitTargets()
+        {
+            spatialHitTargets.Clear();
+            AddSpatialHitTargets(weatherButtonRefs);
+            AddSpatialHitTargets(phaseButtonRefs);
+            AddSpatialHitTargets(speedButtonRefs);
+            AddSpatialHitTarget(soundButton);
+            AddSpatialHitTarget(resetButton);
+            AddSpatialHitTarget(chineseButton);
+            AddSpatialHitTarget(englishButton);
+        }
+
+        private void AddSpatialHitTargets(Button[] buttons)
+        {
+            if (buttons == null)
+            {
+                return;
+            }
+
+            for (var index = 0; index < buttons.Length; index++)
+            {
+                AddSpatialHitTarget(buttons[index]);
+            }
+        }
+
+        private void AddSpatialHitTarget(Button button)
+        {
+            if (button != null && !spatialHitTargets.Contains(button))
+            {
+                spatialHitTargets.Add(button);
             }
         }
 
@@ -937,6 +1149,10 @@ namespace WeatherManager
             objectRoot.transform.SetParent(parent, false);
             var image = objectRoot.AddComponent<Image>();
             image.color = color;
+            // Only Selectable button graphics are intended to receive spatial
+            // rays. Background panels should never steal a controller/mouse
+            // cast from the world.
+            image.raycastTarget = false;
             return image;
         }
 
@@ -998,6 +1214,20 @@ namespace WeatherManager
                 inputSystemModule = keeper.gameObject.AddComponent<InputSystemUIInputModule>();
             }
             inputSystemModule.enabled = true;
+        }
+
+        private void ConfigureSpatialInputModule(Transform xrTrackingOrigin)
+        {
+            if (sceneEventSystem == null)
+            {
+                return;
+            }
+
+            var module = sceneEventSystem.GetComponent<InputSystemUIInputModule>();
+            if (module != null)
+            {
+                module.xrTrackingOrigin = xrTrackingOrigin;
+            }
         }
 
         private static void DestroyUiObject(UnityEngine.Object target)

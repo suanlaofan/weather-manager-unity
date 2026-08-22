@@ -9,4 +9,8 @@ EditorBuildSettings:
     path: Assets/WeatherManager/Scenes/WeatherManager.unity
     guid: 5bbe066ddce8b4e24886e43cd8a993f8
   m_configObjects:
+    Unity.XR.PXR.Settings: {fileID: 11400000, guid: fcacee6ffeedd4dbb991cb8174e132bf, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+    com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: 57b7bcc469fcb4f23b2d5f255468e606, type: 2}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 1bd64cbf3374d451aa7f5ef4e5d0c5af, type: 2}
+    com.unity.xr.openxr.settings4: {fileID: 11400000, guid: fdfaa84d234d54edda339a6596fc58a7, type: 2}
