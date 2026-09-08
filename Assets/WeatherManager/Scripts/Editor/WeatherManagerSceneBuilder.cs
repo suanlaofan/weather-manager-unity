@@ -32,6 +32,7 @@ namespace WeatherManager.Editor
         {
             EnsureDirectories();
             EnsureRuntimeMaterials();
+            var presentationSettings = WeatherPresentationAssetBuilder.Build();
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             scene.name = "WeatherManager";
@@ -62,12 +63,9 @@ namespace WeatherManager.Editor
             var vfxPoolsRoot = CreateChild(tabletopRoot.transform, "VFXPools");
             var lightingRoot = CreateChild(tabletopRoot.transform, "Lighting");
             var cameraRoot = CreateChild(cameraOffset.transform, "Main Camera");
-            // Serialize the dashboard under the HMD now, so the editable scene
-            // makes the intended head-locked ownership obvious. Desktop uses a
-            // ScreenSpaceOverlay canvas, while MR switches the same canvas to a
-            // fixed-size World Space panel.
-            var dashboardRoot = CreateChild(cameraRoot.transform, "Head Locked UI");
-            dashboardRoot.transform.localPosition = new Vector3(0f, -0.16f, 1.12f);
+            // UI has its own meter-sized anchor, independent of head pose and island scale.
+            var dashboardRoot = CreateChild(mrRigRoot.transform, "Spatial UI Anchor");
+            dashboardRoot.transform.localPosition = new Vector3(0f, 1.32f, 1.2f);
             var uiRoot = CreateChild(dashboardRoot.transform, "UI");
 
             var leftController = BuildControllerRay(mrRigRoot.transform, "Left Controller", false);
@@ -119,6 +117,7 @@ namespace WeatherManager.Editor
             // scene now; desktop fallback keeps this component disabled until
             // MrTabletopExperience switches the Canvas to World Space.
             ui.PrepareSpatialInput(mrRigRoot.transform);
+            ui.BuildEditableSpatialPanel(dashboardRoot.transform);
 
             manager.ConfigureSceneReferences(
                 world,
@@ -138,10 +137,26 @@ namespace WeatherManager.Editor
             var angeReport = AngeAssetReplacement.ApplyToScene(scene, world, false);
             var terrainSnapDelta = world.SnapEditableSceneToTerrain();
             world.RefreshBakedAssetReferences();
+            var sceneResidents = residentsRoot.GetComponentsInChildren<ResidentAgent>();
+            if (sceneResidents.Length > 0)
+            {
+                var sharedMotions = ResidentMotionAssetBuilder.Build(sceneResidents[0]);
+                foreach (var resident in sceneResidents)
+                {
+                    var motion = resident.GetComponent<ResidentMotionController>();
+                    if (motion == null) motion = resident.gameObject.AddComponent<ResidentMotionController>();
+                    motion.Configure(sharedMotions);
+                }
+            }
+            WeatherEnvironmentAssetBuilder.Build(world, simulation);
             vfx.PrepareBakedScene(vfxPoolsRoot.transform, worldCamera);
+            vfx.PreparePresentation(presentationSettings);
             vfx.RefreshBakedAssetReferences();
+            AssetizeSceneResources(scene);
             AddEditableColliders(buildingsRoot.transform, vegetationRoot.transform);
             SaveReusablePrefabs(residentsRoot, vfxPoolsRoot);
+            WeatherManagerRevisionTools.ClearIslandStaticFlags(tabletopRoot.transform);
+            WeatherManagerRevisionTools.BakeControllerRay(mrRigRoot.transform);
 
             EditorSceneManager.MarkSceneDirty(scene);
             if (!EditorSceneManager.SaveScene(scene, ScenePath))

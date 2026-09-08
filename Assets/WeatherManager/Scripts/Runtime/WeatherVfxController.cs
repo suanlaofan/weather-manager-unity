@@ -10,7 +10,7 @@ namespace WeatherManager
         private const int MaxFireInstances = 256;
         private const int MaxTornadoInstances = 64;
         private const int MaxRippleInstances = 512;
-        private const int MaxDebrisInstances = 256;
+        private const int MaxDebrisInstances = 40;
         private const int LightningPoolSize = 6;
         private const int CollapsePoolSize = 8;
         private const int BurstPoolSize = 12;
@@ -35,6 +35,7 @@ namespace WeatherManager
         {
             public GameObject Root;
             public LineRenderer Bolt;
+            public LineRenderer[] Branches;
             public Light Flash;
             public ParticleSystem Impact;
             public MeshRenderer Ring;
@@ -122,6 +123,11 @@ namespace WeatherManager
         [SerializeField] private Material snowCollapseRingMaterial;
         [SerializeField] private Material burstParticleMaterial;
         [SerializeField] private Material trajectoryMaterial;
+        [SerializeField] private WeatherParticlePresentation presentation;
+        [SerializeField] private WeatherSurfacePresentation surfacePresentation;
+        private float surfaceTimer;
+        private ParticleSystem[] clockedTransientParticles;
+        public WeatherParticlePresentation Presentation => presentation;
         private WeatherType activeWeather;
         private bool casting;
         private float weatherFade;
@@ -212,7 +218,41 @@ namespace WeatherManager
             EnsureFeedbackObjects();
             EnsureTransientPools();
             RebindFeedbackAssets();
+            PreparePresentation();
             if (Application.isPlaying) ResetAll();
+        }
+
+        public void PreparePresentation(WeatherPresentationSettings settings = null)
+        {
+            ResolveGameplayRoot();
+            if (cursor != null)
+            {
+                var outline = cursor.GetComponent<MeshFilter>();
+                if (outline.sharedMesh == null || outline.sharedMesh.vertexCount != 128)
+                    outline.sharedMesh = CreateRingMesh(64, .955f);
+            }
+            if (trajectoryMaterial != null)
+            {
+                trajectoryMaterial.shader = Shader.Find("WeatherManager/Weather Particle");
+                trajectoryMaterial.SetColor("_BaseColor", Color.white);
+            }
+            if (presentation == null) presentation = effectRoot.GetComponentInChildren<WeatherParticlePresentation>(true);
+            if (presentation == null)
+            {
+                var go = new GameObject("Weather Presentation");
+                go.transform.SetParent(effectRoot, false);
+                presentation = go.AddComponent<WeatherParticlePresentation>();
+            }
+            presentation.Configure(gameplayRoot, settings);
+            if (surfacePresentation == null)
+            {
+                var go = new GameObject("Weather Surfaces"); go.transform.SetParent(gameplayRoot != null ? gameplayRoot : effectRoot, false);
+                surfacePresentation = go.AddComponent<WeatherSurfacePresentation>();
+            }
+            if (presentation.Settings != null) surfacePresentation.Configure(presentation.Settings.surface);
+            if (weatherParticles != null) { weatherParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); weatherParticles.gameObject.SetActive(false); }
+            if (weatherAccentParticles != null) { weatherAccentParticles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear); weatherAccentParticles.gameObject.SetActive(false); }
+            clockedTransientParticles = transientPoolRoot.GetComponentsInChildren<ParticleSystem>(true);
         }
 
         public void RefreshBakedAssetReferences()
@@ -246,16 +286,17 @@ namespace WeatherManager
             hasGameplayCursorPosition = true;
             cursorValid = valid;
             castCharge = 0f;
-            cursorBaseScale = new Vector3(radius * 2f, 0.04f, radius * 2f);
+            cursorBaseScale = new Vector3(radius, 0.04f, radius);
             cursor.transform.localScale = cursorBaseScale;
             ApplyRendererColor(
                 cursorRenderer,
-                valid ? WithAlpha(WeatherPalette.For(type), 0.22f) : new Color(1f, 0.16f, 0.1f, 0.42f));
+                valid ? WithAlpha(WeatherPalette.For(type), 0.20f) : new Color(1f, 0.16f, 0.1f, 0.30f));
             if (castTrajectory != null) castTrajectory.enabled = false;
         }
 
         public void SetCasting(WeatherCastState? cast, bool immediate = false)
         {
+            presentation?.SetCast(cast, immediate);
             casting = cast.HasValue && cast.Value.Active;
             targetWeatherFade = casting ? 1f : 0f;
             if (cursor != null)
@@ -294,7 +335,7 @@ namespace WeatherManager
             }
 
             var activeCast = cast.Value;
-            if (weatherParticles != null
+            if (presentation == null && weatherParticles != null
                 && (activeWeather != activeCast.Type || !weatherParticles.isPlaying))
             {
                 activeWeather = activeCast.Type;
@@ -314,11 +355,11 @@ namespace WeatherManager
             hasGameplayCursorPosition = true;
             cursorValid = true;
             castCharge = Mathf.Clamp01(activeCast.HoldSeconds / 3f);
-            cursorBaseScale = new Vector3(activeCast.Radius * 2f, 0.04f, activeCast.Radius * 2f);
+            cursorBaseScale = new Vector3(activeCast.Radius, 0.04f, activeCast.Radius);
             cursor.transform.localScale = cursorBaseScale;
             ApplyRendererColor(
                 cursorRenderer,
-                WithAlpha(WeatherPalette.For(activeCast.Type), Mathf.Lerp(0.24f, 0.52f, castCharge)));
+                WithAlpha(WeatherPalette.For(activeCast.Type), Mathf.Lerp(0.24f, 0.34f, castCharge)));
             UpdateCastTrajectory(activeCast);
         }
 
@@ -327,6 +368,11 @@ namespace WeatherManager
             IReadOnlyList<TornadoSnapshot> tornadoes,
             bool isBlackout)
         {
+            presentation?.Sync(cells, tornadoes);
+            if (surfacePresentation != null && surfaceTimer <= 0)
+            {
+                surfacePresentation.Sync(cells, .1f); surfaceTimer = .1f;
+            }
             if (isBlackout && !blackout)
             {
                 skyFlash = Mathf.Max(skyFlash, 0.36f);
@@ -593,10 +639,16 @@ namespace WeatherManager
 
         public void Tick(float unscaledDelta, float simulationDelta)
         {
-            visualTime += unscaledDelta;
-            steamCooldown = Mathf.Max(0f, steamCooldown - unscaledDelta);
-            emberCooldown = Mathf.Max(0f, emberCooldown - unscaledDelta);
-            weatherFeedbackCooldown = Mathf.Max(0f, weatherFeedbackCooldown - unscaledDelta);
+            visualTime += simulationDelta;
+            surfaceTimer -= simulationDelta;
+            presentation?.Tick(simulationDelta);
+            if (clockedTransientParticles != null && simulationDelta > 0f)
+                foreach (var particles in clockedTransientParticles)
+                    if (particles != null && particles.gameObject.activeInHierarchy && particles.particleCount > 0)
+                        particles.Simulate(simulationDelta, false, false, false);
+            steamCooldown = Mathf.Max(0f, steamCooldown - simulationDelta);
+            emberCooldown = Mathf.Max(0f, emberCooldown - simulationDelta);
+            weatherFeedbackCooldown = Mathf.Max(0f, weatherFeedbackCooldown - simulationDelta);
             weatherFade = Mathf.MoveTowards(weatherFade, targetWeatherFade, unscaledDelta * 4f);
             if (cursor != null && cursor.activeSelf)
             {
@@ -616,17 +668,20 @@ namespace WeatherManager
                 accentEmission.rateOverTimeMultiplier = Mathf.Lerp(0f, 1f, weatherFade);
             }
 
-            if (casting && weatherFeedbackCooldown <= 0f)
+            if (presentation == null && casting && weatherFeedbackCooldown <= 0f)
             {
                 EmitCastingFeedback();
             }
 
-            UpdateTransientEffects(unscaledDelta);
-            UpdateGlobalFeedback(unscaledDelta);
+            UpdateTransientEffects(simulationDelta);
+            UpdateGlobalFeedback(simulationDelta);
         }
 
         public void ResetAll()
         {
+            presentation?.ResetPresentation();
+            surfacePresentation?.ResetSurfaces();
+            surfaceTimer = 0;
             StopAllCoroutines();
             casting = false;
             targetWeatherFade = 0f;
@@ -672,14 +727,20 @@ namespace WeatherManager
 
         private void LateUpdate()
         {
-            DrawInstanced(surfaceMesh, waterMaterial, waterMatrices, waterCount);
-            DrawInstanced(surfaceMesh, snowMaterial, snowMatrices, snowCount);
+            if (surfacePresentation == null)
+            {
+                DrawInstanced(surfaceMesh, waterMaterial, waterMatrices, waterCount);
+                DrawInstanced(surfaceMesh, snowMaterial, snowMatrices, snowCount);
+            }
             DrawInstanced(surfaceMesh, scorchMaterial, scorchMatrices, scorchCount);
             DrawInstanced(ringMesh, rippleMaterial, rippleMatrices, rippleCount);
-            DrawInstanced(coneMesh, fireMaterial, fireMatrices, fireCount);
-            DrawInstanced(coneMesh, smokeMaterial, smokeMatrices, fireCount);
-            DrawInstanced(ringMesh, tornadoMaterial, tornadoMatrices, tornadoCount);
-            DrawInstanced(ringMesh, fireTornadoMaterial, fireTornadoMatrices, fireTornadoCount);
+            if (presentation == null)
+            {
+                DrawInstanced(coneMesh, fireMaterial, fireMatrices, fireCount);
+                DrawInstanced(coneMesh, smokeMaterial, smokeMatrices, fireCount);
+                DrawInstanced(ringMesh, tornadoMaterial, tornadoMatrices, tornadoCount);
+                DrawInstanced(ringMesh, fireTornadoMaterial, fireTornadoMatrices, fireTornadoCount);
+            }
             DrawInstanced(coneMesh, debrisMaterial, debrisMatrices, debrisCount);
         }
 
@@ -688,7 +749,7 @@ namespace WeatherManager
             var objectRoot = new GameObject("CastCursor");
             objectRoot.transform.SetParent(effectRoot, false);
             var filter = objectRoot.AddComponent<MeshFilter>();
-            filter.sharedMesh = ringMesh;
+            filter.sharedMesh = CreateRingMesh(64, .955f);
             var renderer = objectRoot.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = cursorMaterial;
             renderer.shadowCastingMode = ShadowCastingMode.Off;
@@ -712,7 +773,7 @@ namespace WeatherManager
             var length = Mathf.Lerp(1.1f, 3.4f, castCharge);
             var color = WithAlpha(WeatherPalette.For(activeCast.Type), Mathf.Lerp(0.35f, 0.9f, castCharge));
             castTrajectory.enabled = true;
-            castTrajectory.widthMultiplier = Mathf.Lerp(0.045f, 0.12f, castCharge);
+            castTrajectory.widthMultiplier = Mathf.Lerp(0.045f, 0.12f, castCharge) * Mathf.Abs(effectRoot.lossyScale.x);
             castTrajectory.startColor = color;
             castTrajectory.endColor = WithAlpha(color, 0.06f);
             castTrajectory.SetPosition(0, GameplayToLocalPosition(castTrajectory.transform, start));
@@ -765,7 +826,7 @@ namespace WeatherManager
                 flashObject.transform.rotation = Quaternion.Euler(55f, -25f, 0f);
                 skyFlashLight = flashObject.AddComponent<Light>();
             }
-            skyFlashLight.type = LightType.Directional;
+            skyFlashLight.type = LightType.Point;
             skyFlashLight.color = new Color(0.72f, 0.84f, 1f);
             skyFlashLight.shadows = LightShadows.None;
             skyFlashLight.intensity = 0f;
@@ -783,6 +844,7 @@ namespace WeatherManager
             blackoutBeacon.color = new Color(1f, 0.18f, 0.06f);
             blackoutBeacon.shadows = LightShadows.None;
             blackoutBeacon.intensity = 0f;
+            blackoutBeacon.enabled = false;
         }
 
         private void EnsureTransientPools()
@@ -851,12 +913,23 @@ namespace WeatherManager
             if (slot.Bolt == null) slot.Bolt = boltTransform.gameObject.AddComponent<LineRenderer>();
             slot.Bolt.useWorldSpace = false;
             slot.Bolt.positionCount = BoltPointCount;
-            slot.Bolt.widthMultiplier = 0.11f;
+            slot.Bolt.widthMultiplier = 0.11f * Mathf.Abs(effectRoot.lossyScale.x);
             slot.Bolt.numCornerVertices = 2;
             slot.Bolt.numCapVertices = 2;
             slot.Bolt.shadowCastingMode = ShadowCastingMode.Off;
             slot.Bolt.receiveShadows = false;
             slot.Bolt.sharedMaterial = lightningLineMaterial;
+            if (slot.Branches == null || slot.Branches.Length != 2) slot.Branches = new LineRenderer[2];
+            for (var i = 0; i < 2; i++)
+            {
+                var branchRoot = EnsureChild(root, "Branch_" + i);
+                var line = branchRoot.GetComponent<LineRenderer>();
+                if (line == null) line = branchRoot.gameObject.AddComponent<LineRenderer>();
+                line.useWorldSpace = false; line.positionCount = 4; line.widthMultiplier = .055f * Mathf.Abs(effectRoot.lossyScale.x);
+                line.sharedMaterial = lightningLineMaterial; line.numCapVertices = 2;
+                line.shadowCastingMode = ShadowCastingMode.Off; line.receiveShadows = false;
+                slot.Branches[i] = line;
+            }
 
             var flashTransform = EnsureChild(root, "PointFlash");
             flashTransform.localPosition = Vector3.up * 1.2f;
@@ -867,6 +940,7 @@ namespace WeatherManager
             slot.Flash.color = new Color(0.78f, 0.88f, 1f);
             slot.Flash.shadows = LightShadows.None;
             slot.Flash.intensity = 0f;
+            slot.Flash.enabled = false;
 
             var impactTransform = EnsureChild(root, "ImpactSparks");
             impactTransform.localPosition = Vector3.up * 0.12f;
@@ -931,7 +1005,8 @@ namespace WeatherManager
             main.loop = false;
             main.playOnAwake = false;
             main.simulationSpace = ParticleSystemSimulationSpace.Local;
-            main.maxParticles = 128;
+            main.maxParticles = 32;
+            main.scalingMode = ParticleSystemScalingMode.Hierarchy;
             main.startLifetime = 0.7f;
             main.startSize = new ParticleSystem.MinMaxCurve(0.04f, 0.14f);
             var emission = system.emission;
@@ -988,7 +1063,7 @@ namespace WeatherManager
             slot.Active = true;
             slot.Age = 0f;
             slot.Bolt.enabled = true;
-            slot.Bolt.widthMultiplier = 0.11f;
+            slot.Bolt.widthMultiplier = 0.11f * Mathf.Abs(effectRoot.lossyScale.x);
             for (var index = 0; index < BoltPointCount; index++)
             {
                 var t = index / (BoltPointCount - 1f);
@@ -997,12 +1072,25 @@ namespace WeatherManager
                     : new Vector3(Random.Range(-0.45f, 0.45f), 0f, Random.Range(-0.45f, 0.45f));
                 slot.Bolt.SetPosition(index, Vector3.up * Mathf.Lerp(10f, 0.15f, t) + jitter);
             }
-            slot.Flash.intensity = 9f;
+            for (var b = 0; b < slot.Branches.Length; b++)
+            {
+                var line = slot.Branches[b]; line.enabled = true;
+                line.widthMultiplier = .055f * Mathf.Abs(effectRoot.lossyScale.x);
+                var start = slot.Bolt.GetPosition(b + 2);
+                var direction = new Vector3(b == 0 ? -1.6f : 1.8f, -1.8f, b == 0 ? .7f : -.8f);
+                for (var j = 0; j < 4; j++) line.SetPosition(j, start + direction * (j / 3f) + (j == 0 ? Vector3.zero : Random.insideUnitSphere * .13f));
+            }
+            slot.Flash.intensity = 0f;
             slot.Ring.enabled = true;
             slot.Ring.transform.localScale = Vector3.one * 0.65f;
             ApplyRendererColor(slot.Ring, new Color(1f, 0.86f, 0.24f, 0.78f));
             EmitParticles(slot.Impact, EnvironmentalBurstKind.ElectricSpark, 42);
             skyFlash = 1f;
+            if (skyFlashLight != null)
+            {
+                SetGameplayPosition(skyFlashLight.transform, position + Vector3.up * 2.5f);
+                skyFlashLight.range = 7f * (gameplayRoot != null ? gameplayRoot.lossyScale.x : 1f);
+            }
             cameraShakeTime = Mathf.Max(cameraShakeTime, 0.32f);
             cameraShakeStrength = Mathf.Max(cameraShakeStrength, 0.16f);
         }
@@ -1044,7 +1132,8 @@ namespace WeatherManager
                     if (slot == null || !slot.Active) continue;
                     slot.Age += delta;
                     slot.Bolt.enabled = slot.Age < 0.13f;
-                    slot.Bolt.widthMultiplier = Mathf.Lerp(0.11f, 0.025f, Mathf.Clamp01(slot.Age / 0.13f));
+                    if (slot.Branches != null) foreach (var branch in slot.Branches) if (branch != null) branch.enabled = slot.Bolt.enabled;
+                    slot.Bolt.widthMultiplier = Mathf.Lerp(0.11f, 0.025f, Mathf.Clamp01(slot.Age / 0.13f)) * Mathf.Abs(effectRoot.lossyScale.x);
                     slot.Flash.intensity = Mathf.Lerp(9f, 0f, Mathf.Clamp01(slot.Age / 0.24f));
                     var ringProgress = Mathf.Clamp01(slot.Age / 0.46f);
                     slot.Ring.enabled = ringProgress < 1f;
@@ -1071,14 +1160,17 @@ namespace WeatherManager
         private void UpdateGlobalFeedback(float delta)
         {
             skyFlash = Mathf.MoveTowards(skyFlash, 0f, delta * 4.8f);
-            if (skyFlashLight != null) skyFlashLight.intensity = skyFlash * 2.4f;
+            // URP point lights attenuate with distance squared; table scaling must scale their intensity too.
+            var lightScale = gameplayRoot != null ? Mathf.Abs(gameplayRoot.lossyScale.x) : 1f;
+            if (skyFlashLight != null) skyFlashLight.intensity = skyFlash * 2.4f * lightScale * lightScale;
             if (blackoutBeacon != null)
             {
                 var target = blackout ? 0.18f + Mathf.Sin(visualTime * 3.2f) * 0.07f : 0f;
                 blackoutBeacon.intensity = Mathf.MoveTowards(blackoutBeacon.intensity, target, delta * 0.75f);
             }
 
-            var canMoveCamera = worldCamera != null && !MrRuntimeBridge.IsXrPresentationActive;
+            var canMoveCamera = worldCamera != null && !MrRuntimeBridge.IsXrPresentationActive
+                && (tabletopExperience == null || !tabletopExperience.IsMrActive);
             if (canMoveCamera && lastCameraShakeOffset.sqrMagnitude > 0f)
             {
                 worldCamera.transform.position -= lastCameraShakeOffset;
@@ -1137,20 +1229,42 @@ namespace WeatherManager
             {
                 return;
             }
-            var slot = burstPool[nextBurstSlot];
-            nextBurstSlot = (nextBurstSlot + 1) % burstPool.Length;
+            BurstSlot slot = null;
+            for (var i = 0; i < burstPool.Length; i++)
+            {
+                var index = (nextBurstSlot + i) % burstPool.Length;
+                if (burstPool[index].Particles.particleCount > 0) continue;
+                slot = burstPool[index]; nextBurstSlot = (index + 1) % burstPool.Length; break;
+            }
+            if (slot == null) return;
             SetGameplayPosition(slot.Root, position);
             slot.Particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
             EmitParticles(slot.Particles, kind, count);
         }
 
-        private static void EmitParticles(ParticleSystem system, EnvironmentalBurstKind kind, int count)
+        private Gradient burstFade;
+        private AnimationCurve burstFrames;
+        private void EmitParticles(ParticleSystem system, EnvironmentalBurstKind kind, int count)
         {
             if (system == null || count <= 0)
             {
                 return;
             }
 
+            var config = presentation != null ? presentation.Settings : null;
+            if (config != null)
+            {
+                var material = kind == EnvironmentalBurstKind.Steam ? config.steam
+                    : kind == EnvironmentalBurstKind.SnowPowder ? config.weather[3].material
+                    : kind == EnvironmentalBurstKind.RainSplash || kind == EnvironmentalBurstKind.MudSplash ? config.splash
+                    : kind == EnvironmentalBurstKind.WindDebris || kind == EnvironmentalBurstKind.RockDebris ? config.cloud : config.spark;
+                system.GetComponent<ParticleSystemRenderer>().sharedMaterial = material;
+                var sheet = system.textureSheetAnimation; sheet.enabled = kind == EnvironmentalBurstKind.Steam;
+                if (sheet.enabled) { burstFrames ??= AnimationCurve.Linear(0,0,1,1); sheet.numTilesX = 4; sheet.numTilesY = 4; sheet.frameOverTime = new ParticleSystem.MinMaxCurve(1f, burstFrames); }
+                var fade = system.colorOverLifetime; fade.enabled = true;
+                if (burstFade == null) { burstFade = new Gradient(); burstFade.SetKeys(new[] { new GradientColorKey(Color.white,0),new GradientColorKey(Color.white,1) },
+                    new[] {new GradientAlphaKey(1,0),new GradientAlphaKey(0,1)}); } fade.color = burstFade;
+            }
             var color = BurstColor(kind);
             for (var index = 0; index < count; index++)
             {
@@ -1175,7 +1289,7 @@ namespace WeatherManager
                     velocity = velocity,
                     startColor = color,
                     startLifetime = BurstLifetime(kind) * Random.Range(0.78f, 1.18f),
-                    startSize = BurstSize(kind) * Random.Range(0.72f, 1.2f)
+                    startSize = BurstSize(kind) * Random.Range(0.72f, 1.2f) * (kind == EnvironmentalBurstKind.Steam ? 3.8f : 2.2f)
                 };
                 system.Emit(emit, 1);
             }
@@ -1735,7 +1849,7 @@ namespace WeatherManager
             return mesh;
         }
 
-        private static Mesh CreateRingMesh(int segments)
+        private static Mesh CreateRingMesh(int segments, float inner = .82f)
         {
             var vertices = new Vector3[segments * 2];
             var triangles = new int[segments * 6];
@@ -1743,7 +1857,7 @@ namespace WeatherManager
             {
                 var angle = index / (float)segments * Mathf.PI * 2f;
                 var direction = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
-                vertices[index * 2] = direction * 0.82f;
+                vertices[index * 2] = direction * inner;
                 vertices[index * 2 + 1] = direction;
                 var next = (index + 1) % segments;
                 var offset = index * 6;

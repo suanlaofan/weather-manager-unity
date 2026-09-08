@@ -53,7 +53,7 @@ namespace WeatherManager
             HandleGlobalHotkeys();
             // The XR runtime owns the HMD camera pose.  Desktop orbit/pan/zoom
             // remains available in the emulator and desktop fallback only.
-            if (!MrRuntimeBridge.IsXrPresentationActive)
+            if (!MrRuntimeBridge.IsXrPresentationActive && cameraController != null && cameraController.enabled)
             {
                 cameraController.Tick(unscaledDelta);
             }
@@ -78,9 +78,10 @@ namespace WeatherManager
             var clamped = Mathf.Clamp(scale, 0f, 2f);
             if (clamped <= 0f && casting != null && casting.IsCasting)
             {
-                casting.Cancel(true);
+                casting.SuspendInput();
             }
             timeScale = clamped;
+            audioController?.SetSimulationPaused(timeScale <= 0);
             ui?.SetSpeed(timeScale);
             audioController?.PlayUiToggle();
         }
@@ -105,10 +106,13 @@ namespace WeatherManager
 
         public void ResetWorld()
         {
+            WeatherHaptics.Reset();
             casting?.Cancel(true);
+            audioController?.SetSimulationPaused(false);
             ui?.ResetTransientFeedback();
             simulation?.ResetSimulation();
-            cameraController?.ResetView();
+            foreach (var rotor in FindObjectsByType<AngeEnvironmentalAnimator>(FindObjectsSortMode.None)) rotor.ResetMotion();
+            if (cameraController != null && cameraController.enabled) cameraController.ResetView();
             timeScale = 1f;
             dashboardTimer = 0f;
             ui?.SetSpeed(1f);
@@ -265,7 +269,7 @@ namespace WeatherManager
         {
             if (sun == null || moonFill == null || worldCamera == null) return;
             var night = dayPhase == DayPhase.Night;
-            var targetSun = night ? 0.09f : 1.25f;
+            var targetSun = night ? 0.09f : 1.05f;
             var targetMoon = night ? 0.52f : 0f;
             sun.intensity = Mathf.Lerp(sun.intensity, targetSun, 1f - Mathf.Exp(-delta * 2.8f));
             moonFill.intensity = Mathf.Lerp(moonFill.intensity, targetMoon, 1f - Mathf.Exp(-delta * 2.8f));
@@ -283,7 +287,7 @@ namespace WeatherManager
             {
                 var targetBackground = night
                     ? new Color(0.035f, 0.055f, 0.12f)
-                    : new Color(0.48f, 0.76f, 0.86f);
+                    : new Color(0.38f, 0.51f, 0.54f);
                 worldCamera.backgroundColor = Color.Lerp(
                     worldCamera.backgroundColor,
                     targetBackground,
@@ -292,7 +296,7 @@ namespace WeatherManager
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = night
                 ? new Color(0.12f, 0.16f, 0.28f)
-                : new Color(0.58f, 0.62f, 0.58f);
+                : new Color(0.48f, 0.53f, 0.51f);
         }
 
         private void HandleGlobalHotkeys()

@@ -42,6 +42,8 @@ namespace WeatherManager
         private float animationTime;
         private float wanderTimer;
         private float visualLean;
+        [SerializeField] private ResidentMotionController motionController;
+        private float reactionTimer, recoveryTimer, idleTimer, movementSpeed;
         private uint randomState;
         [SerializeField] private int agentId;
         [SerializeField] private bool configured;
@@ -91,7 +93,7 @@ namespace WeatherManager
             if (terrain == null) return 0f;
             var position = GetGameplayPosition();
             var before = position.y;
-            position.y = terrain.SampleHeight(position) + 0.09f;
+            position.y = terrain.SampleRenderedHeight(position) + 0.025f;
             SetGameplayPosition(position);
             homePosition.y = position.y;
             initialPosition.y = position.y;
@@ -148,6 +150,8 @@ namespace WeatherManager
             }
 
             animationTime += delta;
+            reactionTimer = Mathf.Max(0, reactionTimer - delta);
+            recoveryTimer = Mathf.Max(0, recoveryTimer - delta);
             if (State == ResidentLifeState.Dead)
             {
                 AnimateDead(delta);
@@ -182,6 +186,10 @@ namespace WeatherManager
             }
 
             health = 100f;
+            reactionTimer = recoveryTimer = movementSpeed = 0;
+            idleTimer = (agentId % 7) * .19f;
+            motionController ??= GetComponent<ResidentMotionController>();
+            motionController?.ResetMotion(agentId * .173f);
             animationTime = agentId * 0.173f;
             wanderTimer = 0f;
             visualLean = 0f;
@@ -234,6 +242,9 @@ namespace WeatherManager
                 return;
             }
 
+            if (state == ResidentLifeState.Calm && nextState != ResidentLifeState.Calm && nextState != ResidentLifeState.Dead)
+                reactionTimer = .5f;
+            if (state != ResidentLifeState.Calm && nextState == ResidentLifeState.Calm) recoveryTimer = .8f;
             state = nextState;
             if (State == ResidentLifeState.Dead)
             {
@@ -250,6 +261,12 @@ namespace WeatherManager
             var currentPosition = GetGameplayPosition();
             Vector3 direction;
             float speed;
+            if (State == ResidentLifeState.Calm && idleTimer > 0)
+            {
+                idleTimer = Mathf.Max(0, idleTimer - delta);
+                movementSpeed = 0;
+                return;
+            }
             if (State == ResidentLifeState.Fleeing || (State == ResidentLifeState.Injured && hazard.Threat > 0.08f))
             {
                 direction = hazard.EscapeDirection;
@@ -270,6 +287,7 @@ namespace WeatherManager
                 if (wanderTimer <= 0f || toTarget.sqrMagnitude < 0.18f)
                 {
                     PickWanderTarget();
+                    if (State == ResidentLifeState.Calm) idleTimer = .6f + (agentId % 5) * .18f;
                     toTarget = wanderTarget - currentPosition;
                     toTarget.y = 0f;
                 }
@@ -278,9 +296,11 @@ namespace WeatherManager
                 speed = State == ResidentLifeState.Injured ? 0.44f : 0.66f;
             }
 
+            speed *= reactionTimer > 0 ? .2f : recoveryTimer > 0 ? .35f : 1f;
             var nextPosition = currentPosition + direction * (speed * delta);
-            nextPosition.y = terrain != null ? terrain.SampleHeight(nextPosition) + 0.09f : initialPosition.y;
+            nextPosition.y = terrain != null ? terrain.SampleRenderedHeight(nextPosition) + 0.025f : initialPosition.y;
             nextPosition = ClampToIsland(nextPosition, 0.91f);
+            movementSpeed = new Vector2(nextPosition.x - currentPosition.x, nextPosition.z - currentPosition.z).magnitude / Mathf.Max(.001f, delta);
             SetGameplayPosition(nextPosition);
             if (direction.sqrMagnitude > 0.001f)
             {
@@ -296,30 +316,25 @@ namespace WeatherManager
 
         private void AnimateWalking(float delta)
         {
-            var fleeing = State == ResidentLifeState.Fleeing;
-            var injured = State == ResidentLifeState.Injured;
-            var frequency = fleeing ? 12f : injured ? 5.2f : 6.5f;
-            var amplitude = fleeing ? 52f : injured ? 18f : 26f;
-            var stride = Mathf.Sin(animationTime * frequency) * amplitude;
-            if (injured && stride < 0f) stride *= 0.35f;
-            if (leftArm != null) leftArm.localRotation = leftArmBaseRotation * Quaternion.Euler(stride, 0f, 0f);
-            if (rightArm != null) rightArm.localRotation = rightArmBaseRotation * Quaternion.Euler(-stride, 0f, 0f);
-            if (leftLeg != null) leftLeg.localRotation = leftLegBaseRotation * Quaternion.Euler(-stride, 0f, 0f);
-            if (rightLeg != null) rightLeg.localRotation = rightLegBaseRotation * Quaternion.Euler(stride, 0f, 0f);
-
-            var bob = Mathf.Abs(Mathf.Sin(animationTime * frequency)) * (fleeing ? 0.035f : 0.018f);
-            if (body != null)
-            {
-                body.localPosition = Vector3.Lerp(body.localPosition, bodyBasePosition + Vector3.up * bob, 1f - Mathf.Exp(-delta * 14f));
-            }
-            if (head != null)
-            {
-                head.localPosition = Vector3.Lerp(head.localPosition, headBasePosition + Vector3.up * bob, 1f - Mathf.Exp(-delta * 14f));
-            }
+            motionController ??= GetComponent<ResidentMotionController>();
+            var motion = reactionTimer > 0 ? ResidentMotion.Guard : recoveryTimer > 0 ? ResidentMotion.Recover
+                : State == ResidentLifeState.Injured ? ResidentMotion.Limp : State == ResidentLifeState.Fleeing ? ResidentMotion.Run
+                : movementSpeed > .08f ? ResidentMotion.Walk : ResidentMotion.Idle;
+            var rate = motion == ResidentMotion.Walk ? movementSpeed / .66f
+                : motion == ResidentMotion.Run ? movementSpeed / 2.05f
+                : motion == ResidentMotion.Limp ? movementSpeed / .55f : 1f;
+            motionController?.Tick(motion, rate, delta, agentId * .173f);
         }
 
         private void AnimateDead(float delta)
         {
+            motionController ??= GetComponent<ResidentMotionController>();
+            if (motionController != null)
+            {
+                SetGameplayRotation(Quaternion.Slerp(GetGameplayRotation(), deadRotation, 1f - Mathf.Exp(-delta * 5f)));
+                motionController.Tick(ResidentMotion.Fall, 1, delta, 0);
+                return;
+            }
             SetGameplayRotation(Quaternion.Slerp(
                 GetGameplayRotation(),
                 deadRotation,
@@ -343,7 +358,7 @@ namespace WeatherManager
             var angle = Next01() * Mathf.PI * 2f;
             var distance = Mathf.Lerp(0.7f, 3.1f, Next01());
             wanderTarget = homePosition + new Vector3(Mathf.Cos(angle) * distance, 0f, Mathf.Sin(angle) * distance);
-            wanderTarget.y = terrain != null ? terrain.SampleHeight(wanderTarget) + 0.09f : initialPosition.y;
+            wanderTarget.y = terrain != null ? terrain.SampleRenderedHeight(wanderTarget) + 0.025f : initialPosition.y;
             wanderTarget = ClampToIsland(wanderTarget, 0.84f);
             wanderTimer = Mathf.Lerp(2.2f, 6.5f, Next01());
         }

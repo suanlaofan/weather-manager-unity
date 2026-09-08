@@ -1,0 +1,10 @@
+{
+  "source": "Existing Weather Manager icon, final transparent-corner revision from 2026-08-19",
+  "original_filename": "weather-manager-icon-pink-corners-transparent.png",
+  "original_sha256": "bdb5594aa89c438265750d52e056889c8f2bec6e94cb9962fba8a3604f67a46c",
+  "dimensions": [
+    1024,
+    1024
+  ],
+  "usage": "Application launcher icon; original PNG preserved. Android adaptive foreground receives transparent safety padding during Editor import."
+}

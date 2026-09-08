@@ -68,230 +68,89 @@ namespace WeatherManager
             SetWeather(WeatherType.Wind);
         }
 
+        private readonly WeatherPressGate pressGate = new WeatherPressGate();
+        private string pointerRoute;
+
+        public void SuspendInput()
+        {
+            pressGate.RequireRelease();
+            Cancel(false);
+        }
+
+#if UNITY_EDITOR
+        private bool reviewOverride;
+        private bool reviewPressed;
+        private Vector3 reviewPoint;
+        public void SetReviewCast(WeatherType? weather, Vector3 point)
+        {
+            reviewOverride = weather.HasValue;
+            reviewPressed = weather.HasValue;
+            reviewPoint = point;
+            if (!weather.HasValue) { Cancel(false); return; }
+            if (selectedWeather != weather.Value) SetWeather(weather.Value);
+        }
+#endif
+
         public void Tick(float unscaledDelta, float simulationScale, bool paused)
         {
+#if UNITY_EDITOR
+            if (reviewOverride)
+            {
+                activeCastInput = "EditorReview";
+                TickWorldCast(unscaledDelta, simulationScale, paused, reviewPoint, reviewPressed && !casting, reviewPressed);
+                return;
+            }
+#endif
             ReadWeatherHotkeys();
-            if (worldCamera == null || simulation == null)
+            if (worldCamera == null || simulation == null) { SuspendInput(); return; }
+            var pressed = false;
+            var overUi = false;
+            var valid = false;
+            var point = currentCenter;
+            string route;
+            if (mrTabletop != null && mrTabletop.IsMrActive)
             {
-                hasPointerValidity = false;
-                if (casting)
+                Ray ray;
+                if (mrTabletop.AllowsEmulatorMouseCasting && TryReadEmulatorPointer(unscaledDelta,
+                    out var position, out _, out pressed, out var source))
                 {
-                    Cancel(true);
+                    route = "emulator-" + source;
+                    ray = worldCamera.ScreenPointToRay(position);
+                    overUi = ui != null && ui.IsScreenPointerOverDashboard(position);
                 }
+                else if (mrTabletop.TryGetRightHandCastRay(out ray, out _, out pressed))
+                {
+                    route = "right-hand-trigger";
+                    overUi = mrTabletop.IsSpatialRayOverDashboard(ray);
+                }
+                else { pointerRoute = null; SuspendInput(); ui?.SetSpatialTargetValid(false); return; }
+                valid = !overUi && mrTabletop.TryRaycastGameplay(ray, simulation, out point);
+            }
+            else
+            {
+                if (!TryReadCastPointer(unscaledDelta, out var position, out _, out pressed, out overUi))
+                { pointerRoute = null; SuspendInput(); return; }
+                route = "desktop-pointer";
+                valid = !overUi && TryGetWorldPointer(position, out point);
+            }
+            if (pointerRoute != null && pointerRoute != route) pressGate.RequireRelease();
+            pointerRoute = route;
+            var allowed = pressGate.Read(pressed, overUi, valid, paused, out var begin);
+            ui?.SetSpatialTargetValid(valid);
+            if (!allowed)
+            {
+                if (casting) Cancel(false);
+                if (valid && !overUi) vfx?.SetCursor(point, true, selectedWeather, CastRadius);
+                else vfx?.SetCursor(currentCenter, false, selectedWeather, CastRadius);
                 return;
             }
-
-            // The PICO emulator exposes a tracked hand even while the tester is
-            // using the host mouse.  Permit that one explicitly identified
-            // simulator path before controller input; real headsets never take
-            // this branch, so stale mouse coordinates cannot create a cast.
-            if (mrTabletop != null
-                && mrTabletop.AllowsEmulatorMouseCasting
-                && TryReadEmulatorPointer(
-                    unscaledDelta,
-                    out var emulatorPosition,
-                    out var emulatorPressedThisFrame,
-                    out var emulatorPressed,
-                    out var emulatorInputSource))
-            {
-                mrTriggerWasPressed = false;
-                // Some emulator routes report a sustained press without a
-                // reliable wasPressedThisFrame edge. Derive a local edge too,
-                // so a normal host click-and-hold can always begin a cast.
-                var emulatorPressStarted = emulatorPressed && !emulatorPointerWasPressed;
-                var emulatorReleased = !emulatorPressed && emulatorPointerWasPressed;
-                emulatorPointerWasPressed = emulatorPressed;
-                emulatorPressedThisFrame |= emulatorPressStarted;
-
-                // This needs to happen before a tabletop raycast. The dashboard
-                // is head-locked and therefore has no world collider; raycasting
-                // the tabletop first would incorrectly report a dashboard click
-                // as an off-table cast attempt.
-                var emulatorOverUi = ui != null && ui.IsScreenPointerOverDashboard(emulatorPosition);
-                if (emulatorPressedThisFrame)
-                {
-                    Debug.Log(
-                        $"WEATHER_MANAGER_EMULATOR_POINTER_DOWN:source={emulatorInputSource}:"
-                        + $"screen={emulatorPosition.x:0},{emulatorPosition.y:0}:ui={emulatorOverUi}");
-                }
-                if (emulatorReleased)
-                {
-                    Debug.Log(
-                        $"WEATHER_MANAGER_EMULATOR_POINTER_UP:source={emulatorInputSource}:"
-                        + $"screen={emulatorPosition.x:0},{emulatorPosition.y:0}");
-                }
-                if (!emulatorPressed)
-                {
-                    emulatorPointerSource = EmulatorPointerSource.None;
-                }
-                if (emulatorOverUi)
-                {
-                    if (emulatorPressedThisFrame)
-                    {
-                        Debug.Log(
-                            $"WEATHER_MANAGER_EMULATOR_CAST_REJECTED:source={emulatorInputSource}:reason=dashboard_ui");
-                    }
-                    if (casting) Cancel(true);
-                    return;
-                }
-
-                // A release can happen after the host pointer has moved off
-                // the tabletop. Keep the cast's last valid center long enough
-                // to deliver the physical release to TickWorldCast; otherwise
-                // audio/VFX would only stop through a later focus loss.
-                if (!emulatorPressed && casting)
-                {
-                    TickWorldCast(
-                        unscaledDelta,
-                        simulationScale,
-                        paused,
-                        currentCenter,
-                        false,
-                        false);
-                    return;
-                }
-
-                // The MR island is translated and scaled into physical space.
-                // A screen ray therefore has to be converted back through the
-                // tabletop root before the simulation receives it; using the
-                // desktop pointer helper here produced either an off-island
-                // point or a point in physical meters rather than game units.
-                var emulatorRay = worldCamera.ScreenPointToRay(emulatorPosition);
-                var projection = "tabletop";
-                if (!mrTabletop.TryRaycastGameplay(emulatorRay, simulation, out var emulatorPoint))
-                {
-                    if (mrTabletop.TryGetEmulatorFallbackGameplayPoint(simulation, out emulatorPoint))
-                    {
-                        projection = "fallback-center";
-                    }
-                    else
-                    {
-                        if (emulatorPressedThisFrame)
-                        {
-                            Debug.Log(
-                                $"WEATHER_MANAGER_EMULATOR_CAST_REJECTED:source={emulatorInputSource}:"
-                                + $"reason=outside_tabletop:screen={emulatorPosition.x:0},{emulatorPosition.y:0}");
-                        }
-                        hasPointerValidity = false;
-                        if (casting) Cancel(true);
-                        return;
-                    }
-                }
-
-                if (emulatorPressedThisFrame)
-                {
-                    activeCastInput = $"emulator-{emulatorInputSource}";
-                    Debug.Log(
-                        $"WEATHER_MANAGER_EMULATOR_CAST_TARGET:source={emulatorInputSource}:"
-                        + $"projection={projection}:point={emulatorPoint.x:0.00},{emulatorPoint.y:0.00},{emulatorPoint.z:0.00}");
-                }
-
-                TickWorldCast(
-                    unscaledDelta,
-                    simulationScale,
-                    paused,
-                    emulatorPoint,
-                    emulatorPressedThisFrame,
-                    emulatorPressed);
-                return;
-            }
-            emulatorPointerWasPressed = false;
-            emulatorPointerSource = EmulatorPointerSource.None;
-
-            // A tracked PICO controller ray is the authoritative real-headset
-            // world-space input path.
-            if (mrTabletop != null
-                && mrTabletop.TryGetRightHandCastRay(out var handRay, out _, out var handPressed))
-            {
-                var handPressedThisFrame = handPressed && !mrTriggerWasPressed;
-                mrTriggerWasPressed = handPressed;
-
-                // The PICO emulator can map a host left click to the virtual
-                // right-hand trigger instead of Mouse.current. Record that
-                // route explicitly so the runtime evidence proves which input
-                // path actually began a cast.
-                if (handPressedThisFrame)
-                {
-                    activeCastInput = mrTabletop.AllowsEmulatorMouseCasting
-                        ? "emulator-tracked-trigger"
-                        : "right-hand-trigger";
-                }
-
-                // The World Space dashboard has priority over the tabletop.
-                // Do not let a PICO trigger click a weather button and cast
-                // through it into the island in the same frame.
-                if (mrTabletop.IsSpatialRayOverDashboard(handRay))
-                {
-                    if (casting) Cancel(true);
-                    return;
-                }
-
-                var trackedProjection = "tabletop";
-                if (!mrTabletop.TryRaycastGameplay(handRay, simulation, out var handPoint)
-                    && (!mrTabletop.AllowsEmulatorMouseCasting
-                        || !mrTabletop.TryGetEmulatorFallbackGameplayPoint(simulation, out handPoint)))
-                {
-                    // A valid tracked controller is authoritative on a real
-                    // headset.  Falling through to mouse/touch here can create
-                    // ghost casts from a stale emulator cursor when the user
-                    // points off the island.
-                    if (casting) Cancel(true);
-                    return;
-                }
-
-                if (MrRuntimeBridge.IsPicoEmulator
-                    && handPoint.x == 0f
-                    && handPoint.z == 0f)
-                {
-                    trackedProjection = "fallback-center";
-                }
-                if (handPressedThisFrame)
-                {
-                    Debug.Log(
-                        $"WEATHER_MANAGER_EMULATOR_CAST_TARGET:source=tracked-trigger:"
-                        + $"projection={trackedProjection}:point={handPoint.x:0.00},{handPoint.y:0.00},{handPoint.z:0.00}");
-                    TickWorldCast(unscaledDelta, simulationScale, paused, handPoint, handPressedThisFrame, handPressed);
-                }
-                else
-                {
-                    TickWorldCast(unscaledDelta, simulationScale, paused, handPoint, false, handPressed);
-                }
-                return;
-            }
-            mrTriggerWasPressed = false;
-
-            if (!TryReadCastPointer(
-                    unscaledDelta,
-                    out var screenPosition,
-                    out var pressedThisFrame,
-                    out var isPressed,
-                    out var pointerOverUi))
-            {
-                hasPointerValidity = false;
-                if (casting) Cancel(true);
-                return;
-            }
-            var pointerValid = TryGetWorldPointer(screenPosition, out var point);
-            if (!pointerValid)
-            {
-                hasPointerValidity = false;
-                if (casting)
-                {
-                    Cancel(true);
-                }
-                return;
-            }
-
-            TickWorldCast(unscaledDelta, simulationScale, paused, point, pressedThisFrame && !pointerOverUi, isPressed);
-
+            if (begin) activeCastInput = route;
+            TickWorldCast(unscaledDelta, simulationScale, paused, point, begin, pressed);
         }
 
         public void SetWeather(WeatherType type)
         {
-            if (casting)
-            {
-                Cancel(true);
-            }
+            if (casting) SuspendInput();
 
             selectedWeather = type;
             ui?.SetSelectedWeather(type);
@@ -300,6 +159,7 @@ namespace WeatherManager
 
         public void Cancel(bool immediate)
         {
+            if (immediate) pressGate.RequireRelease();
             var wasCasting = casting;
             var completedHoldSeconds = holdSeconds;
             var completedInput = activeCastInput;
@@ -400,12 +260,14 @@ namespace WeatherManager
 
         private void OnDisable()
         {
+            pressGate.RequireRelease();
             hasPointerValidity = false;
             Cancel(true);
         }
 
         private void OnApplicationFocus(bool hasFocus)
         {
+            pressGate.RequireRelease();
             if (hasFocus)
             {
                 hasPointerValidity = false;

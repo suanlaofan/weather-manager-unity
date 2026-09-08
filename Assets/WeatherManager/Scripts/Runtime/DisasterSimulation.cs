@@ -100,6 +100,8 @@ namespace WeatherManager
                 SimulateStep(FixedStep, cast);
             }
 
+            world.TickResidents(simulationDelta, this);
+            world.TickVehicles(simulationDelta, this);
             RebuildVisualSnapshots();
             vfx?.SyncDisasterVisuals(surfaceVisuals, tornadoSnapshots, blackoutTimer > 0f);
         }
@@ -591,8 +593,7 @@ namespace WeatherManager
             TryTriggerHighlandLandslide(delta);
             UpdateTornadoes(delta, cast);
             UpdateDamageables(delta);
-            world.TickResidents(delta, this);
-            world.TickVehicles(delta, this);
+
             RebuildStats();
         }
 

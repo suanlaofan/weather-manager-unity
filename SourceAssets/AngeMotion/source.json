@@ -1,0 +1,8 @@
+{
+  "provider": "ange-embed MCP",
+  "collection": "actorcore-motion-v1",
+  "id": "ac61d4d4-1743-440a-9a16-9b41b318040b",
+  "sourceUrl": "https://cdn-hm.holymolly.ai/2/e/2edb3836-d743-4825-bd43-9df153c932c4.glb",
+  "usage": "Sagittal rigid-pivot retarget in Resident Run clip; source rest and root motion not applied",
+  "licenseMetadata": "No independent license field returned by MCP; retain original source record for provenance"
+}

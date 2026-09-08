@@ -76,7 +76,7 @@ namespace WeatherManager
 
                 var direction = toTarget.normalized;
                 var nextPosition = currentPosition + direction * (speed * speedFactor * delta);
-                nextPosition.y = (terrain != null ? terrain.SampleHeight(nextPosition) + 0.13f : state.InitialPosition.y)
+                nextPosition.y = (terrain != null ? terrain.SampleRenderedHeight(nextPosition) + 0.065f : state.InitialPosition.y)
                     + Mathf.Sin(animationTime * 7f) * hazard.Flood * 0.035f;
                 if (world != null)
                 {
@@ -220,7 +220,8 @@ namespace WeatherManager
 
             BuildWorldContents();
             EnsureNightLights(true);
-            StaticBatchingUtility.Combine(environmentRoot.gameObject);
+            // Every island descendant moves when the MR table is placed or resized.
+            // Static batching would leave renderer geometry in its original world pose.
         }
 
         public void PrepareBakedScene(
@@ -386,7 +387,7 @@ namespace WeatherManager
 
         public float SampleGroundHeight(Vector3 position)
         {
-            return terrainGenerator != null ? terrainGenerator.SampleHeight(position) : 0f;
+            return terrainGenerator != null ? terrainGenerator.SampleRenderedHeight(position) : 0f;
         }
 
         public Vector3 SampleGroundNormal(Vector3 position)
@@ -555,6 +556,7 @@ namespace WeatherManager
             for (var index = 0; index < damageables.Count; index++)
             {
                 var record = damageables[index];
+                record.Root?.GetComponent<WeatherObjectPresentation>()?.ResetPresentation();
                 record.Health = record.MaxHealth;
                 record.Burning = false;
                 record.Destroyed = false;
@@ -750,8 +752,14 @@ namespace WeatherManager
                     break;
             }
 
-            record.Root.localRotation = rotation;
-            record.Root.localScale = Vector3.Scale(record.InitialScale, scaleMultiplier);
+            var presentation = record.Root.GetComponent<WeatherObjectPresentation>();
+            if (Application.isPlaying && presentation != null && (record.Kind != DamageableKind.Vehicle || stage == DamageVisualStage.Destroyed))
+                presentation.BeginDamagePose(rotation, Vector3.Scale(record.InitialScale, scaleMultiplier));
+            else
+            {
+                record.Root.localRotation = rotation;
+                record.Root.localScale = Vector3.Scale(record.InitialScale, scaleMultiplier);
+            }
         }
 
         private void ApplyDefaultSeasonPalette()
@@ -1077,19 +1085,9 @@ namespace WeatherManager
 
         private Vector3[] CreateVehicleRoute()
         {
-            var route = new[]
-            {
-                new Vector3(-15f, 0f, -11f),
-                new Vector3(-7f, 0f, -13f),
-                new Vector3(3f, 0f, -12f),
-                new Vector3(13f, 0f, -9f),
-                new Vector3(15f, 0f, -1f),
-                new Vector3(13f, 0f, 7f),
-                new Vector3(4f, 0f, 10f),
-                new Vector3(-7f, 0f, 9f),
-                new Vector3(-15f, 0f, 5f),
-                new Vector3(-16f, 0f, -4f)
-            };
+            var sharedPath=LowPolyTerrainGenerator.TownRoadPath;
+            var route=new Vector3[sharedPath.Length-1];
+            for(var i=0;i<route.Length;i++)route[i]=new Vector3(sharedPath[i].x,0,sharedPath[i].y);
             for (var index = 0; index < route.Length; index++) route[index] = TerrainPoint(route[index], 0.13f);
             return route;
         }
@@ -1288,7 +1286,7 @@ namespace WeatherManager
             bool castShadows)
         {
             var gameObject = new GameObject(name);
-            gameObject.isStatic = isStatic;
+            gameObject.isStatic = false;
             var part = gameObject.transform;
             part.SetParent(parent, false);
             part.localPosition = localPosition;

@@ -70,10 +70,36 @@ namespace WeatherManager
         [SerializeField] private MeshCollider waterCollider;
         [SerializeField] private MeshFilter roadFilter;
         [SerializeField] private Material terrainMaterial;
+        private Mesh sampledHeightMesh;
+        private Vector3[] sampledHeightVertices;
 
         public float HalfWidth => worldSize.x * 0.5f;
         public float HalfDepth => worldSize.y * 0.5f;
         public float WaterLevel => waterLevel;
+        public static readonly Vector2[] TownRoadPath={new Vector2(-16,-10),new Vector2(-14,-13.5f),new Vector2(11,-13.5f),new Vector2(15,-10),new Vector2(16,0),new Vector2(14.5f,8),new Vector2(5,10.5f),new Vector2(-7,10),new Vector2(-16,6),new Vector2(-17,-3),new Vector2(-16,-10)};
+
+        public void RebuildPolishedPresentation()
+        {
+            if(terrainFilter==null||terrainCollider==null)throw new InvalidOperationException("Existing terrain references are required.");
+            terrainFilter.sharedMesh=BuildTerrainMesh();terrainCollider.sharedMesh=terrainFilter.sharedMesh;
+            skirtFilter.sharedMesh=BuildSkirtMesh();waterFilter.sharedMesh=BuildWaterMesh();
+            if(waterCollider!=null)waterCollider.sharedMesh=waterFilter.sharedMesh;
+            Physics.SyncTransforms();roadFilter.sharedMesh=BuildRoadMesh();
+        }
+
+        public float SampleRenderedHeight(Vector3 gameplayPoint)
+        {
+            var mesh=terrainFilter!=null?terrainFilter.sharedMesh:null;
+            if(mesh==null||!mesh.isReadable)return SampleHeight(gameplayPoint);
+            if(mesh!=sampledHeightMesh){sampledHeightMesh=mesh;sampledHeightVertices=mesh.vertices;}
+            if(sampledHeightVertices.Length!=columns*rows*6)return SampleHeight(gameplayPoint);
+            var gx=Mathf.Clamp((gameplayPoint.x+HalfWidth)/worldSize.x*columns,0,columns-.0001f);
+            var gz=Mathf.Clamp((gameplayPoint.z+HalfDepth)/worldSize.y*rows,0,rows-.0001f);
+            var x=Mathf.FloorToInt(gx);var z=Mathf.FloorToInt(gz);var u=gx-x;var v=gz-z;
+            var index=(z*columns+x)*6;var a=sampledHeightVertices[index].y;
+            var b=sampledHeightVertices[index+1].y;var c=sampledHeightVertices[index+2].y;var d=sampledHeightVertices[index+5].y;
+            return v>=u?(1-v)*a+(v-u)*b+u*c:(1-u)*a+v*c+(u-v)*d;
+        }
         public float SnowLine => snowLine;
         public Vector2 LakeCenter => lakeCenter;
         public IReadOnlyList<Vector2> RiverSpline => riverSpline;
@@ -360,12 +386,12 @@ namespace WeatherManager
             var forest = SoftEllipseMask(new Vector2(point.x, point.z), new Vector2(-15f, 15f), new Vector2(25f, 21f), 0.3f, 1.2f);
             var farm = SoftEllipseMask(new Vector2(point.x, point.z), farmlandCenter, farmlandRadius, 0.45f, 1.18f);
             var town = SoftEllipseMask(new Vector2(point.x, point.z), townCenter, townRadius, 0.45f, 1.16f);
-            var grass = Color.Lerp(new Color(0.2f, 0.5f, 0.17f), new Color(0.4f, 0.69f, 0.24f), Mathf.Clamp01(0.5f + point.z / 90f));
-            grass = Color.Lerp(grass, new Color(0.1f, 0.34f, 0.15f), forest * 0.58f);
-            grass = Color.Lerp(grass, new Color(0.53f, 0.57f, 0.2f), farm * 0.38f);
-            grass = Color.Lerp(grass, new Color(0.35f, 0.52f, 0.27f), town * 0.28f);
-            var rock = Color.Lerp(new Color(0.69f, 0.3f, 0.11f), new Color(0.48f, 0.34f, 0.23f), Mathf.InverseLerp(7f, 15f, height));
-            var sand = new Color(0.82f, 0.53f, 0.2f);
+            var grass = Color.Lerp(new Color(.30f,.49f,.29f),new Color(.47f,.62f,.34f),Mathf.Clamp01(.5f+point.z/90));
+            grass=Color.Lerp(grass,new Color(.23f,.43f,.31f),forest*.45f);
+            grass=Color.Lerp(grass,new Color(.55f,.59f,.36f),farm*.32f);
+            grass=Color.Lerp(grass,new Color(.46f,.59f,.39f),town*.22f);
+            var rock=Color.Lerp(new Color(.53f,.53f,.45f),new Color(.39f,.45f,.43f),Mathf.InverseLerp(7,15,height));
+            var sand=new Color(.77f,.69f,.49f);
             var snow = new Color(0.9f, 0.94f, 0.92f);
             var rockBlend = Mathf.Clamp01(
                 Mathf.InverseLerp(0.12f, 0.48f, slope) * 0.74f
@@ -374,85 +400,62 @@ namespace WeatherManager
             color = Color.Lerp(color, snow, Smooth01(snowLine - 0.2f, snowLine + 0.65f, height));
             color = Color.Lerp(sand, color, Smooth01(waterLevel + 0.1f, waterLevel + 0.82f, height));
             var hash = Hash01(column, row, half);
-            return color * Mathf.Lerp(0.92f, 1.06f, hash);
+            return color * Mathf.Lerp(.975f,1.025f,hash);
         }
 
         private Mesh BuildSkirtMesh()
         {
-            const int segments = 128;
+            const int segments = 160;
             var vertices = new List<Vector3>(segments * 18);
             var normals = new List<Vector3>(segments * 18);
             var colors = new List<Color>(segments * 18);
             var triangles = new List<int>(segments * 18);
             for (var index = 0; index < segments; index++)
             {
-                var a0 = index / (float)segments * Mathf.PI * 2f;
-                var a1 = (index + 1f) / segments * Mathf.PI * 2f;
-                var edge0 = IslandBoundaryScale(a0) * (1f - shoreFalloff * 0.42f);
-                var edge1 = IslandBoundaryScale(a1) * (1f - shoreFalloff * 0.42f);
-                var p0 = new Vector3(Mathf.Cos(a0) * HalfWidth * edge0, 0f, Mathf.Sin(a0) * HalfDepth * edge0);
-                var p1 = new Vector3(Mathf.Cos(a1) * HalfWidth * edge1, 0f, Mathf.Sin(a1) * HalfDepth * edge1);
-                p0.y = Mathf.Max(waterLevel + 0.12f, SampleHeight(p0));
-                p1.y = Mathf.Max(waterLevel + 0.12f, SampleHeight(p1));
-                var mid0 = new Vector3(p0.x, p0.y - 1.25f, p0.z);
-                var mid1 = new Vector3(p1.x, p1.y - 1.25f, p1.z);
-                var bottom0 = new Vector3(p0.x, -3.4f, p0.z);
-                var bottom1 = new Vector3(p1.x, -3.4f, p1.z);
-                AddColoredQuad(vertices, normals, colors, triangles, p0, p1, mid1, mid0, new Color(0.86f, 0.31f, 0.09f));
-                AddColoredQuad(vertices, normals, colors, triangles, mid0, mid1, bottom1, bottom0, new Color(0.24f, 0.11f, 0.055f));
+                var p0=RectPerimeter(index/(float)segments);var p1=RectPerimeter((index+1f)/segments);
+                p0.y=Mathf.Max(waterLevel+.025f,SampleHeight(p0));p1.y=Mathf.Max(waterLevel+.025f,SampleHeight(p1));
+                var upper0=new Vector3(p0.x,-2.35f,p0.z);var upper1=new Vector3(p1.x,-2.35f,p1.z);
+                var mid0=new Vector3(p0.x*.988f,-3.05f,p0.z*.988f);var mid1=new Vector3(p1.x*.988f,-3.05f,p1.z*.988f);
+                var bottom0=new Vector3(p0.x*.988f,-5.2f,p0.z*.988f);var bottom1=new Vector3(p1.x*.988f,-5.2f,p1.z*.988f);
+                AddColoredQuad(vertices,normals,colors,triangles,p0,p1,upper1,upper0,new Color(.34f,.55f,.55f));
+                AddColoredQuad(vertices,normals,colors,triangles,upper0,upper1,mid1,mid0,new Color(.67f,.59f,.43f));
+                AddColoredQuad(vertices,normals,colors,triangles,mid0,mid1,bottom1,bottom0,new Color(.28f,.35f,.32f));
+                AddColoredTriangle(vertices,normals,colors,triangles,new Vector3(0,-5.2f,0),bottom0,bottom1,new Color(.23f,.29f,.27f));
             }
             return BuildMesh("WM Low Poly Island Cutaway", vertices, normals, colors, triangles);
         }
 
+        private Vector3 RectPerimeter(float t)
+        {
+            t=Mathf.Repeat(t,1)*4;var edge=Mathf.FloorToInt(t);t-=edge;
+            return edge switch {0=>new Vector3(Mathf.Lerp(-HalfWidth,HalfWidth,t),0,-HalfDepth),
+                1=>new Vector3(HalfWidth,0,Mathf.Lerp(-HalfDepth,HalfDepth,t)),
+                2=>new Vector3(Mathf.Lerp(HalfWidth,-HalfWidth,t),0,HalfDepth),
+                _=>new Vector3(-HalfWidth,0,Mathf.Lerp(HalfDepth,-HalfDepth,t))};
+        }
+
         private Mesh BuildWaterMesh()
         {
-            var vertices = new List<Vector3>(512);
-            var triangles = new List<int>(768);
-            const int lakeSegments = 64;
-            vertices.Add(new Vector3(lakeCenter.x, waterLevel + 0.025f, lakeCenter.y));
-            for (var index = 0; index <= lakeSegments; index++)
-            {
-                var angle = index / (float)lakeSegments * Mathf.PI * 2f;
-                var edge = LakeBoundaryScale(angle) * 0.94f;
-                vertices.Add(new Vector3(
-                    lakeCenter.x + Mathf.Cos(angle) * lakeRadius.x * edge,
-                    waterLevel + 0.03f,
-                    lakeCenter.y + Mathf.Sin(angle) * lakeRadius.y * edge));
-                if (index == 0) continue;
-                triangles.Add(0);
-                triangles.Add(index);
-                triangles.Add(index + 1);
-            }
-
-            if (riverSpline != null && riverSpline.Length >= 2)
-            {
-                AddFlatStrip(vertices, triangles, riverSpline, riverWidth * 0.94f, waterLevel + 0.03f);
-            }
-
-            var mesh = new Mesh { name = "WM Lake and River" };
-            mesh.SetVertices(vertices);
-            mesh.SetTriangles(triangles, 0, true);
-            mesh.RecalculateNormals();
-            mesh.RecalculateBounds();
-            return mesh;
+            // A continuous water surface joins the lake, river and coastline.
+            // Terrain depth hides its inland portion; the perimeter has a closed diorama side wall.
+            var y=waterLevel+.025f;
+            var mesh=new Mesh {name="WM Continuous Lagoon"};
+            mesh.vertices=new[]{new Vector3(-HalfWidth,y,-HalfDepth),new Vector3(-HalfWidth,y,HalfDepth),
+                new Vector3(HalfWidth,y,HalfDepth),new Vector3(HalfWidth,y,-HalfDepth)};
+            mesh.triangles=new[]{0,1,2,0,2,3};mesh.uv=new[]{Vector2.zero,Vector2.up,Vector2.one,Vector2.right};
+            mesh.RecalculateNormals();mesh.RecalculateBounds();return mesh;
         }
 
         private Mesh BuildRoadMesh()
         {
             var vertices = new List<Vector3>(256);
             var triangles = new List<int>(384);
+            AddRoad(vertices, triangles, TownRoadPath, 1.25f);
             AddRoad(vertices, triangles, new[]
             {
-                new Vector2(-15f, -11f), new Vector2(-7f, -13f), new Vector2(3f, -12f),
-                new Vector2(13f, -9f), new Vector2(15f, -1f), new Vector2(13f, 7f),
-                new Vector2(4f, 10f), new Vector2(-7f, 9f), new Vector2(-15f, 5f), new Vector2(-16f, -4f),
-                new Vector2(-15f, -11f)
-            }, 1.25f);
-            AddRoad(vertices, triangles, new[]
-            {
-                new Vector2(-13f, -7f), new Vector2(-20f, -12f), new Vector2(-27f, -18f),
-                new Vector2(-37f, -21f), new Vector2(-45f, -20f)
-            }, 1.05f);
+                new Vector2(-15f, -9f), new Vector2(-21f, -9f), new Vector2(-29f, -9f),
+                new Vector2(-36f, -9f), new Vector2(-40f, -10f)
+            }, .85f);
             AddRoad(vertices, triangles, new[]
             {
                 new Vector2(10f, -8f), new Vector2(17f, -10f), new Vector2(24f, -10f),
@@ -460,11 +463,12 @@ namespace WeatherManager
             }, 1.05f);
             AddRoad(vertices, triangles, new[]
             {
-                new Vector2(32.65f, -10.05f), new Vector2(34.1f, -10.75f),
-                new Vector2(37f, -14f), new Vector2(41f, -20f),
-                new Vector2(45f, -27f)
-            }, 1.05f);
+                new Vector2(34.0f, -10.05f), new Vector2(35.7f, -9.5f),
+                new Vector2(39.5f, -6f), new Vector2(41f, 0f),new Vector2(40.5f,6f)
+            }, .75f);
+            ProjectRoadTriangles(vertices,triangles);
             var mesh = new Mesh { name = "WM Curved Terrain Roads" };
+            mesh.indexFormat=IndexFormat.UInt32;
             mesh.SetVertices(vertices);
             mesh.SetTriangles(triangles, 0, true);
             mesh.RecalculateNormals();
@@ -472,10 +476,54 @@ namespace WeatherManager
             return mesh;
         }
 
+        // Split the road along the actual terrain triangles. Sampling only the
+        // strip edges lets hill vertices pierce the middle of a wide road.
+        private void ProjectRoadTriangles(List<Vector3> roadVertices,List<int> roadTriangles)
+        {
+            if(terrainFilter==null||terrainFilter.sharedMesh==null)return;
+            var ground=terrainFilter.sharedMesh.vertices;
+            var result=new List<Vector3>();var indices=new List<int>();
+            var polygon=new List<Vector2>(7);var scratch=new List<Vector2>(7);
+            Vector2 Xz(Vector3 p)=>new Vector2(p.x,p.z);
+            float Cross(Vector2 a,Vector2 b)=>a.x*b.y-a.y*b.x;
+            for(var r=0;r<roadTriangles.Count;r+=3)
+            {
+                var a=Xz(roadVertices[roadTriangles[r]]);var b=Xz(roadVertices[roadTriangles[r+1]]);var c=Xz(roadVertices[roadTriangles[r+2]]);
+                var min=Vector2.Min(a,Vector2.Min(b,c));var max=Vector2.Max(a,Vector2.Max(b,c));
+                var x0=Mathf.Clamp(Mathf.FloorToInt((min.x+HalfWidth)/worldSize.x*columns),0,columns-1);
+                var x1=Mathf.Clamp(Mathf.FloorToInt((max.x+HalfWidth)/worldSize.x*columns),0,columns-1);
+                var z0=Mathf.Clamp(Mathf.FloorToInt((min.y+HalfDepth)/worldSize.y*rows),0,rows-1);
+                var z1=Mathf.Clamp(Mathf.FloorToInt((max.y+HalfDepth)/worldSize.y*rows),0,rows-1);
+                for(var z=z0;z<=z1;z++)for(var x=x0;x<=x1;x++)for(var half=0;half<2;half++)
+                {
+                    var offset=(z*columns+x)*6+half*3;
+                    polygon.Clear();polygon.Add(a);polygon.Add(b);polygon.Add(c);
+                    for(var edge=0;edge<3&&polygon.Count>=3;edge++)
+                    {
+                        var u=Xz(ground[offset+edge]);var v=Xz(ground[offset+(edge+1)%3]);
+                        scratch.Clear();var previous=polygon[polygon.Count-1];var pd=Cross(v-u,previous-u);
+                        foreach(var current in polygon)
+                        {
+                            var cd=Cross(v-u,current-u);var inside=cd<=.00001f;var priorInside=pd<=.00001f;
+                            if(inside!=priorInside)scratch.Add(Vector2.LerpUnclamped(previous,current,pd/(pd-cd)));
+                            if(inside)scratch.Add(current);
+                            previous=current;pd=cd;
+                        }
+                        var swap=polygon;polygon=scratch;scratch=swap;
+                    }
+                    if(polygon.Count<3)continue;
+                    var start=result.Count;
+                    foreach(var p in polygon)result.Add(new Vector3(p.x,SampleRenderedHeight(new Vector3(p.x,0,p.y))+.035f,p.y));
+                    for(var i=1;i<polygon.Count-1;i++){indices.Add(start);indices.Add(start+i);indices.Add(start+i+1);}
+                }
+            }
+            roadVertices.Clear();roadVertices.AddRange(result);roadTriangles.Clear();roadTriangles.AddRange(indices);
+        }
+
         private void AddRoad(List<Vector3> vertices, List<int> triangles, Vector2[] points, float halfWidth)
         {
             if (points == null || points.Length < 2) return;
-            var sampledPoints = DensifyPath(points, 1.2f);
+            var sampledPoints = DensifyPath(points, .35f);
             var closed = Vector2.SqrMagnitude(sampledPoints[0] - sampledPoints[sampledPoints.Count - 1]) < 0.001f;
             var pointCount = closed ? sampledPoints.Count - 1 : sampledPoints.Count;
             var start = vertices.Count;
@@ -553,7 +601,8 @@ namespace WeatherManager
 
         private Vector3 RoadPoint(Vector2 point)
         {
-            return new Vector3(point.x, SampleHeight(point.x, point.y) + 0.07f, point.y);
+            var p=new Vector3(point.x,0,point.y);
+            return new Vector3(point.x,SampleRenderedHeight(p)+.075f,point.y);
         }
 
         private float LakeMask(Vector2 point)
@@ -715,7 +764,7 @@ namespace WeatherManager
             var filter = root.AddComponent<MeshFilter>();
             renderer = root.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = material;
-            root.isStatic = true;
+            root.isStatic = false;
             return filter;
         }
 

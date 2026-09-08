@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4db2795cf66584c21a4d56455867284f, type: 3}
+  m_Name: WeatherPresentation
+  m_EditorClassIdentifier: Assembly-CSharp::WeatherManager.WeatherPresentationSettings
+  weather:
+  - weather: 0
+    material: {fileID: 2100000, guid: 8b6394dff286b48c4ae1dc774d10031f, type: 2}
+    capacity: 100
+    particlesPerSecond: 62
+    size: {x: 0.95, y: 1.65}
+    lifetime: {x: 0.6, y: 1.1}
+    color: {r: 0.25, g: 0.78, b: 0.82, a: 1}
+  - weather: 1
+    material: {fileID: 2100000, guid: 26d353e4033ae41a1835126df4ffb98a, type: 2}
+    capacity: 180
+    particlesPerSecond: 210
+    size: {x: 0.85, y: 1.25}
+    lifetime: {x: 0.38, y: 0.62}
+    color: {r: 0.65, g: 0.86, b: 1, a: 0.9}
+  - weather: 2
+    material: {fileID: 2100000, guid: 1a783b2c4ddc747dca5bce853c6d743d, type: 2}
+    capacity: 24
+    particlesPerSecond: 18
+    size: {x: 0.09, y: 0.17}
+    lifetime: {x: 0.22, y: 0.4}
+    color: {r: 1, g: 0.88, b: 0.28, a: 1}
+  - weather: 3
+    material: {fileID: 2100000, guid: fabdbd848c38c4c45ae2089ff74d880e, type: 2}
+    capacity: 260
+    particlesPerSecond: 76
+    size: {x: 0.24, y: 0.42}
+    lifetime: {x: 2.4, y: 3.3}
+    color: {r: 0.82, g: 0.94, b: 1, a: 1}
+  - weather: 4
+    material: {fileID: 2100000, guid: c2f0f42dfc8c8403fa1401c2f5645abc, type: 2}
+    capacity: 50
+    particlesPerSecond: 24
+    size: {x: 1, y: 1.6}
+    lifetime: {x: 1, y: 1.6}
+    color: {r: 1, g: 0.67, b: 0.32, a: 0.32}
+  surface: {fileID: 2100000, guid: 2f73170322a954f98bdf03fa1fce3f23, type: 2}
+  flame: {fileID: 2100000, guid: fe5b354c52bd74775ab4b4685e05d83d, type: 2}
+  smoke: {fileID: 2100000, guid: 479a1075918534334b65e107226f6a8a, type: 2}
+  spark: {fileID: 2100000, guid: 641857e4d190f4b76bd2c1a2ba750f4d, type: 2}
+  splash: {fileID: 2100000, guid: f7234fcea3bfb4850b8b9f5a3e89b944, type: 2}
+  ripple: {fileID: 2100000, guid: fb2d5226e5b8f44f1bf87fcab12ff4b5, type: 2}
+  cloud: {fileID: 2100000, guid: 5230ab5357f47473f9b807c09fd1a1ba, type: 2}
+  steam: {fileID: 2100000, guid: 6760a8c2e524b41a895abb7d49eee97c, type: 2}
+  funnel: {fileID: 2100000, guid: 823fccb8971904f4898e05d803924b1e, type: 2}
+  fireFunnel: {fileID: 2100000, guid: 28d961bb184b44ce6bcb5649d52368da, type: 2}
+  density: 1
+  smallTableReadability: 0.18
+  establishSeconds: 0.25

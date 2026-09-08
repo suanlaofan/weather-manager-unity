@@ -1,0 +1,114 @@
+[
+  {
+    "path": "Assets/WeatherManager/Art/PolishAnge/buildings-0-6d455bfe.glb",
+    "record": {
+      "point_id": "6d455bfe-cc9f-4bbd-8942-0a5a7e7147cb",
+      "data": {
+        "aabb": {
+          "max": [
+            0.47809538,
+            0.89493513,
+            0.5
+          ],
+          "min": [
+            -0.47809538,
+            0.0,
+            -0.5
+          ]
+        },
+        "cover": "https://cdn-hm.holymolly.ai/d/2/d28e0dbe-1798-416f-b5fe-60295cdbfa7a.webp",
+        "model": "https://cdn-hm.holymolly.ai/7/0/70046953-2d3c-484a-a7b2-b0492a8742f7.glb",
+        "task_id": "770d9e1f-1124-4fc6-818a-2145cb2ce00a"
+      },
+      "image": "https://cdn-hm.holymolly.ai/d/2/d28e0dbe-1798-416f-b5fe-60295cdbfa7a.webp",
+      "text": null,
+      "video": null,
+      "score": 0.63076276
+    },
+    "bytes": 672544
+  },
+  {
+    "path": "Assets/WeatherManager/Art/PolishAnge/buildings-1-e19101a9.glb",
+    "record": {
+      "point_id": "e19101a9-3897-4a51-afd7-e46a88ea1bb8",
+      "data": {
+        "aabb": {
+          "max": [
+            0.3852658,
+            0.747313,
+            0.5
+          ],
+          "min": [
+            -0.3852658,
+            0.0,
+            -0.5
+          ]
+        },
+        "cover": "https://cdn-hm.holymolly.ai/f/b/fb81a240-a99b-4f53-8e7a-172a543582a5.webp",
+        "model": "https://cdn-hm.holymolly.ai/7/7/77bb5329-f519-4c9d-bda6-c367a9670706.glb",
+        "task_id": "c84241a7-6f7c-48fa-a80a-98021ce8fd3e"
+      },
+      "image": "https://cdn-hm.holymolly.ai/f/b/fb81a240-a99b-4f53-8e7a-172a543582a5.webp",
+      "text": null,
+      "video": null,
+      "score": 0.6205258
+    },
+    "bytes": 471284
+  },
+  {
+    "path": "Assets/WeatherManager/Art/PolishAnge/buildings-2-51c98878.glb",
+    "record": {
+      "point_id": "51c98878-ce4d-4375-b294-38a9be128df2",
+      "data": {
+        "aabb": {
+          "max": [
+            0.42498773,
+            1.0,
+            0.35071468
+          ],
+          "min": [
+            -0.42498773,
+            0.0,
+            -0.35071468
+          ]
+        },
+        "cover": "https://cdn-hm.holymolly.ai/2/d/2de4fef5-17d4-4bd0-aaa5-4cbf2273e2ce.webp",
+        "model": "https://cdn-hm.holymolly.ai/5/d/5d2fe006-20cf-472d-871c-c2ef99263ecb.glb",
+        "task_id": "669f2797-244c-4c0e-882f-2cdfe99e69d1"
+      },
+      "image": "https://cdn-hm.holymolly.ai/2/d/2de4fef5-17d4-4bd0-aaa5-4cbf2273e2ce.webp",
+      "text": null,
+      "video": null,
+      "score": 0.61945236
+    },
+    "bytes": 729420
+  },
+  {
+    "path": "Assets/WeatherManager/Art/PolishAnge/groundworks-2-bba9d563.glb",
+    "record": {
+      "point_id": "bba9d563-03a7-4672-9041-df667decf4af",
+      "data": {
+        "aabb": {
+          "max": [
+            0.5,
+            0.45519504,
+            0.20885019
+          ],
+          "min": [
+            -0.5,
+            0.0,
+            -0.20885019
+          ]
+        },
+        "cover": "https://cdn-hm.holymolly.ai/b/4/b424da2d-0d69-4bbd-a238-59edccb681c3.webp",
+        "model": "https://cdn-hm.holymolly.ai/9/b/9b41054b-44ed-4faa-955d-4cea0b8e7eb1.glb",
+        "task_id": "8d5c67eb-a402-4b40-9c61-4ce57720b05d"
+      },
+      "image": "https://cdn-hm.holymolly.ai/b/4/b424da2d-0d69-4bbd-a238-59edccb681c3.webp",
+      "text": null,
+      "video": null,
+      "score": 0.6031536
+    },
+    "bytes": 394196
+  }
+]

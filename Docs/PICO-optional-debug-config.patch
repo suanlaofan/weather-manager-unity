@@ -1,0 +1,11 @@
+--- a/Packages/com.unity.xr.picoxr/Runtime/Debugger/Scripts/Core/PXR_PicoDebuggerManager.cs
++++ b/Packages/com.unity.xr.picoxr/Runtime/Debugger/Scripts/Core/PXR_PicoDebuggerManager.cs
+@@ -20,7 +20,7 @@
+         private static void OnBeforeSceneLoadRuntimeMethod()
+         {
+             var config = Resources.Load<PXR_PicoDebuggerSO>("PXR_PicoDebuggerSO");
+-            if(config.isOpen){
++            if(config != null && config.isOpen){
+                 AddPrefab();
+             }
+         }

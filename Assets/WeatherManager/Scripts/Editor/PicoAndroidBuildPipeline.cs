@@ -9,6 +9,13 @@ namespace WeatherManager.Editor
     /// <summary>Repeatable Android build entry point for PICO emulator/device review.</summary>
     public static class PicoAndroidBuildPipeline
     {
+        private const string RevisionQueueKey = "WeatherManager.RevisionBuildQueued";
+        private static bool switchingBuildTarget;
+        [InitializeOnLoadMethod]
+        private static void RestoreRevisionBuildQueue()
+        {
+            if (SessionState.GetBool(RevisionQueueKey, false)) EditorApplication.update += DispatchRevisionBuild;
+        }
         public const string PackageName = "com.weathermanager.picomr";
         /// <summary>
         /// Deliberately separate from the legacy flat-window smoke build. This
@@ -19,10 +26,66 @@ namespace WeatherManager.Editor
 
         public static void BuildPicoReviewApk()
         {
+            BuildApk(TrueMrApkPath);
+        }
+
+        public static void BuildRevisionApk()
+        {
+            Directory.CreateDirectory("Evidence/Revision");
+            File.WriteAllText("Evidence/Revision/build-status.json", "{\"status\":\"building\"}");
+            try
+            {
+                PlayerSettings.bundleVersion = "0.5.0";
+                PlayerSettings.Android.bundleVersionCode = Math.Max(5,PlayerSettings.Android.bundleVersionCode);
+                var path = "Builds/PICO/WeatherManager-0.5.0-LowPoly-20260908.apk";
+                BuildApk(path);
+                File.WriteAllText("Evidence/Revision/build-status.json", "{\"status\":\"passed\",\"path\":\""+path+"\"}");
+            }
+            catch(Exception error)
+            {
+                File.WriteAllText("Evidence/Revision/build-status.json", UnityEngine.JsonUtility.ToJson(new BuildFailure { status="failed", error=error.ToString() },true));
+                Debug.LogException(error);
+            }
+        }
+        public static void QueueRevisionBuild()
+        {
+            SessionState.SetBool(RevisionQueueKey, true);
+            Directory.CreateDirectory("Evidence/Revision");
+            File.WriteAllText("Evidence/Revision/build-status.json", "{\"status\":\"queued\"}");
+            EditorApplication.update -= DispatchRevisionBuild;
+            EditorApplication.update += DispatchRevisionBuild;
+        }
+        private static void DispatchRevisionBuild()
+        {
+            if(EditorApplication.isCompiling || EditorApplication.isUpdating) return;
+            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android)
+            {
+                if (!switchingBuildTarget)
+                {
+                    switchingBuildTarget = true;
+                    File.WriteAllText("Evidence/Revision/build-status.json", "{\"status\":\"switching_android\"}");
+                    if (!EditorUserBuildSettings.SwitchActiveBuildTargetAsync(BuildTargetGroup.Android, BuildTarget.Android))
+                    {
+                        SessionState.SetBool(RevisionQueueKey, false);
+                        EditorApplication.update -= DispatchRevisionBuild;
+                        throw new InvalidOperationException("Cannot switch the active build target to Android.");
+                    }
+                }
+                return;
+            }
+            SessionState.SetBool(RevisionQueueKey, false);
+            EditorApplication.update -= DispatchRevisionBuild;
+            BuildRevisionApk();
+        }
+        [Serializable] private sealed class BuildFailure {public string status,error;}
+
+        private static void BuildApk(string apkPath)
+        {
+            WeatherApplicationIcon.Configure();
             PicoMrProjectSetup.ConfigureAndroidPicoLoader();
             var projectRoot = Directory.GetParent(Application.dataPath)?.FullName
                 ?? throw new InvalidOperationException("Project root is unavailable.");
-            var outputPath = Path.Combine(projectRoot, TrueMrApkPath);
+            var outputPath = Path.Combine(projectRoot, apkPath);
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath) ?? projectRoot);
 
             #pragma warning disable CS0618

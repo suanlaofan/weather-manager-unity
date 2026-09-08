@@ -18,6 +18,11 @@ namespace WeatherManager
         [SerializeField] private GameObject sourcePrefab;
         [SerializeField] private Renderer[] renderers = Array.Empty<Renderer>();
 
+        private DamageVisualStage shownStage;
+        private DamageVisualStage queuedStage;
+        private float stageDelay;
+        private GameManager manager;
+
         public string SourceAssetId => sourceAssetId;
         public string SourceModel => sourceModel;
         public DamageableKind DamageableKind => damageableKind;
@@ -65,6 +70,24 @@ namespace WeatherManager
 
         public void ApplyStage(DamageVisualStage stage)
         {
+            if (Application.isPlaying && stage == DamageVisualStage.Destroyed && shownStage != stage && GetComponent<WeatherObjectPresentation>() != null)
+            {
+                if (stageDelay <= 0) { queuedStage = stage; stageDelay = .43f; }
+                return;
+            }
+            stageDelay = 0;
+            ApplyStageImmediately(stage);
+        }
+        private void Update()
+        {
+            if (stageDelay <= 0) return;
+            manager ??= FindFirstObjectByType<GameManager>();
+            stageDelay -= Mathf.Min(Time.unscaledDeltaTime, .05f) * (manager != null ? manager.TimeScale : 1);
+            if (stageDelay <= 0) ApplyStageImmediately(queuedStage);
+        }
+        private void ApplyStageImmediately(DamageVisualStage stage)
+        {
+            shownStage = stage;
             var useCritical = stage == DamageVisualStage.Critical && criticalVisual != null;
             var useDestroyed = stage == DamageVisualStage.Destroyed && destroyedVisual != null;
             if (visualRoot != null)

@@ -198,8 +198,11 @@ namespace WeatherManager
             }
         }
 
+        public void SetSimulationPaused(bool paused) { AudioListener.pause = paused; }
+
         public void Tick(float unscaledDelta)
         {
+            if (AudioListener.pause) return;
             if (weatherSource == null)
             {
                 return;
@@ -219,6 +222,7 @@ namespace WeatherManager
 
         public void PlayLightning(Vector3 position, BiomeType biome, bool ignited)
         {
+            WeatherHaptics.Pulse(.30f, .07f);
             var volume = biome == BiomeType.Highland ? 1f : biome == BiomeType.Water ? 0.72f : 0.9f;
             var pitch = BiomePitch(biome) * (ignited ? 1.04f : 0.98f);
             PlaySpatial(LightningCue(biome), lightningClip, position, volume, 0.08f, pitch);
@@ -231,6 +235,7 @@ namespace WeatherManager
 
         public void PlayCollapse(Vector3 position, BiomeType biome)
         {
+            WeatherHaptics.Pulse(.22f, .12f);
             PlaySpatial(
                 CollapseCue(biome),
                 collapseClip,
@@ -258,6 +263,7 @@ namespace WeatherManager
 
         public void PlaySteam(Vector3 position, BiomeType biome)
         {
+            WeatherHaptics.Pulse(.10f, .05f);
             PlaySpatial(SteamCue(biome), steamClip, position, 0.58f, 0.9f, UnityEngine.Random.Range(0.96f, 1.05f) * BiomePitch(biome));
         }
 
@@ -416,6 +422,7 @@ namespace WeatherManager
             SetGameplayPosition(source.transform, position);
             source.spatialBlend = 0.58f;
             source.pitch = pitch;
+            source.ignoreListenerPause = false;
             source.PlayOneShot(clip, volume);
         }
 
@@ -429,6 +436,7 @@ namespace WeatherManager
             source.transform.localPosition = Vector3.zero;
             source.spatialBlend = 0f;
             source.pitch = 1f;
+            source.ignoreListenerPause = true;
             source.PlayOneShot(clip, volume);
         }
 

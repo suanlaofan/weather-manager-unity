@@ -8,6 +8,7 @@ namespace WeatherManager
         private sealed class VisualState
         {
             public Light[] NightLights;
+            public float[] AuthoredRanges;
             public DayPhase Phase;
             public float Time;
         }
@@ -53,8 +54,10 @@ namespace WeatherManager
                     continue;
                 }
                 var pulse = 0.94f + Mathf.Sin(state.Time * 2.2f + index * 0.7f) * 0.06f;
-                light.intensity = Mathf.Lerp(light.intensity, night * 1.55f * pulse, 1f - Mathf.Exp(-unscaledDelta * 4f));
-                light.enabled = light.intensity > 0.01f;
+                var scale=Mathf.Abs(light.transform.lossyScale.x);
+                light.range=state.AuthoredRanges[index]*scale;
+                light.intensity = Mathf.Lerp(light.intensity, night * 1.55f * pulse*scale*scale, 1f - Mathf.Exp(-unscaledDelta * 4f));
+                light.enabled = night>.01f||light.intensity>0.000001f;
             }
         }
 
@@ -71,6 +74,8 @@ namespace WeatherManager
                 Phase = DayPhase.Day,
                 Time = 0f
             };
+            state.AuthoredRanges=new float[state.NightLights.Length];
+            for(var i=0;i<state.NightLights.Length;i++)state.AuthoredRanges[i]=state.NightLights[i]!=null?state.NightLights[i].range:0;
             States.Add(world, state);
             return state;
         }
@@ -84,7 +89,9 @@ namespace WeatherManager
                 {
                     continue;
                 }
-                light.intensity = intensity * 1.55f;
+                var scale=Mathf.Abs(light.transform.lossyScale.x);
+                light.range=state.AuthoredRanges[index]*scale;
+                light.intensity = intensity * 1.55f*scale*scale;
                 light.enabled = intensity > 0.01f;
             }
         }

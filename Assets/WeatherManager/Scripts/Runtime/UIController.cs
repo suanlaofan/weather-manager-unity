@@ -35,6 +35,9 @@ namespace WeatherManager
         private readonly ToastSeverity[] eventSeverities = new ToastSeverity[EventLogCapacity];
 
         [SerializeField] private Font font;
+        [SerializeField] private SpatialWeatherDashboard spatialPanel;
+        private bool spatialTargetValid = true;
+        public SpatialWeatherDashboard SpatialPanel => spatialPanel;
         [SerializeField] private Canvas canvas;
         [SerializeField] private Text currentWeatherText;
         [SerializeField] private Text castStateText;
@@ -168,67 +171,37 @@ namespace WeatherManager
             ApplyLocalizedLabels();
         }
 
-        /// <summary>
-        /// Converts the authored dashboard from a flat overlay into a compact,
-        /// head-locked world-space panel when PICO MR has an active HMD. The
-        /// parent anchor follows the HMD; the canvas remains a fixed physical
-        /// size rather than being stretched to the desktop mirror ratio.
-        /// </summary>
-        public void ConfigureSpatialDashboard(
-            Camera xrCamera,
-            Transform dashboardRoot,
-            Transform xrTrackingOrigin,
-            float metersPerPixel)
+        public SpatialWeatherDashboard BuildEditableSpatialPanel(Transform dashboardRoot)
         {
-            if (canvas == null || xrCamera == null || dashboardRoot == null)
+            if (spatialPanel == null) spatialPanel = dashboardRoot.GetComponentInChildren<SpatialWeatherDashboard>(true);
+            if (spatialPanel == null)
             {
-                return;
+                var panel = new GameObject("Spatial Weather Controls");
+                panel.transform.SetParent(dashboardRoot, false);
+                spatialPanel = panel.AddComponent<SpatialWeatherDashboard>();
             }
+            var face = Resources.Load<Font>("WeatherManager/Fonts/NotoSansCJKsc-Regular") ?? font;
+            spatialPanel.Build(this, face);
+            return spatialPanel;
+        }
 
-            canvas.renderMode = RenderMode.WorldSpace;
-            canvas.worldCamera = xrCamera;
-            canvas.sortingOrder = 0;
-            var canvasTransform = canvas.transform as RectTransform;
-            canvasTransform.SetParent(dashboardRoot, false);
-            canvasTransform.localPosition = Vector3.zero;
-            canvasTransform.localRotation = Quaternion.identity;
-            canvasTransform.localScale = Vector3.one * Mathf.Clamp(metersPerPixel, 0.0004f, 0.003f);
-            // Explicitly use one logical 16:10 dashboard shape.  The Android
-            // mirror can be portrait-sized, but must never reshape or stretch
-            // the physical head-locked UI seen by either eye.
-            canvasTransform.sizeDelta = new Vector2(1440f, 900f);
+        public void ConfigureSpatialDashboard(Camera xrCamera, Transform dashboardRoot, Transform xrTrackingOrigin, float metersPerPixel)
+        {
+            if (canvas == null || xrCamera == null || dashboardRoot == null) return;
+            EnsureEventSystem();
+            ConfigureSpatialInputModule(xrTrackingOrigin);
+            var panel = BuildEditableSpatialPanel(dashboardRoot);
+            canvas.gameObject.SetActive(false);
+            panel.Configure(xrCamera, xrTrackingOrigin);
+            panel.RefreshState(lastStats, lastWeather, lastCasting, spatialTargetValid);
+            Debug.Log($"WEATHER_MANAGER_SPATIAL_UI_READY:worldAnchored=True:sizeMeters=0.800x{SpatialWeatherDashboard.LogicalSize.y*.001f:F3}");
+        }
 
-            var scaler = canvas.GetComponent<CanvasScaler>();
-            if (scaler != null)
-            {
-                // A ScreenSize-based scaler would use the flat emulator mirror
-                // dimensions. In XR that produces a panel whose apparent shape
-                // changes with the capture window instead of the headset view.
-                scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
-                scaler.scaleFactor = 1f;
-            }
-
-            PrepareSpatialInput(xrTrackingOrigin);
-
-            // A normal GraphicRaycaster only understands screen-space mouse
-            // input. PICO controller poses are tracked devices, so the
-            // Input System's matching world-space raycaster is required.
-            var graphicRaycaster = canvas.GetComponent<GraphicRaycaster>();
-            if (graphicRaycaster != null)
-            {
-                // A PICO emulator forwards host mouse input through Unity's
-                // normal UI path.  Retain this raycaster only there so a
-                // desktop click can select a head-locked button and is not
-                // treated as a cast through the panel. Real headsets use the
-                // tracked-device raycaster below exclusively.
-                graphicRaycaster.enabled = MrRuntimeBridge.IsPicoEmulator;
-            }
-            var trackedRaycaster = canvas.GetComponent<TrackedDeviceRaycaster>();
-            if (trackedRaycaster != null) trackedRaycaster.enabled = true;
-            Debug.Log(
-                $"WEATHER_MANAGER_MR_HEAD_LOCKED_UI_READY:renderMode=WorldSpace"
-                + $":metersPerPixel={canvasTransform.localScale.x:0.00000}"
-                + $":canvas={canvasTransform.sizeDelta.x:0}x{canvasTransform.sizeDelta.y:0}");
+        public void SetSpatialTargetValid(bool valid)
+        {
+            if (spatialTargetValid == valid) return;
+            spatialTargetValid = valid;
+            spatialPanel?.RefreshState(lastStats, lastWeather, lastCasting, valid);
         }
 
         /// <summary>
@@ -263,6 +236,7 @@ namespace WeatherManager
         /// </summary>
         public bool IsSpatialRayOverDashboard(Ray ray)
         {
+            if (spatialPanel != null && spatialPanel.IsVisible) return spatialPanel.Contains(ray);
             if (canvas == null || canvas.renderMode != RenderMode.WorldSpace)
             {
                 return false;
@@ -294,6 +268,8 @@ namespace WeatherManager
         /// </summary>
         public bool IsScreenPointerOverDashboard(Vector2 screenPosition)
         {
+            if (spatialPanel != null && spatialPanel.IsVisible && spatialPanel.Canvas.worldCamera != null)
+                return spatialPanel.Contains(spatialPanel.Canvas.worldCamera.ScreenPointToRay(screenPosition));
             if (canvas == null || canvas.renderMode != RenderMode.WorldSpace)
             {
                 return false;
@@ -381,11 +357,13 @@ namespace WeatherManager
             var speed = timeScale <= 0f ? LocalizationService.Text("state.paused") : $"{timeScale:0.#}x";
             elapsedText.text = $"{FormatTime(stats.Elapsed)}   {speed}   {LocalizationService.Text(LocalizationService.Season(season).Key)}   {LocalizationService.Text(LocalizationService.Phase(phase).Key)}";
             UpdateMetricFeedback(stats);
+            spatialPanel?.RefreshState(stats, weather, lastCasting, spatialTargetValid);
         }
 
         public void SetSelectedWeather(WeatherType selected)
         {
             lastWeather = selected;
+            spatialPanel?.RefreshState(lastStats, selected, lastCasting, spatialTargetValid);
             foreach (var pair in weatherButtons)
             {
                 var selectedButton = pair.Key == selected;
@@ -422,6 +400,7 @@ namespace WeatherManager
         public void SetCasting(bool casting)
         {
             lastCasting = casting;
+            spatialPanel?.RefreshState(lastStats, lastWeather, casting, spatialTargetValid);
             if (castStateText != null)
             {
                 castStateText.text = LocalizationService.Text(casting ? "state.casting" : "state.ready");
@@ -453,6 +432,7 @@ namespace WeatherManager
             {
                 return;
             }
+            spatialPanel?.ShowNotice(message.Resolve());
             var severity = ResolveToastSeverity(message.Key, color);
             AppendEvent(message, severity);
             if (toastRoutine != null)
@@ -469,6 +449,7 @@ namespace WeatherManager
 
         public void ResetTransientFeedback()
         {
+            spatialPanel?.ClearFeedback();
             if (toastRoutine != null)
             {
                 StopCoroutine(toastRoutine);
@@ -888,9 +869,9 @@ namespace WeatherManager
                     20);
             }
 
-            var targetFont = localizedRuntimeFont != null && localizedRuntimeFont.HasCharacter('中')
-                ? localizedRuntimeFont
-                : font;
+            var bundledFont = Resources.Load<Font>("WeatherManager/Fonts/NotoSansCJKsc-Regular");
+            var targetFont = bundledFont != null ? bundledFont
+                : localizedRuntimeFont != null && localizedRuntimeFont.HasCharacter('中') ? localizedRuntimeFont : font;
             if (targetFont == null) return;
             var texts = canvas.GetComponentsInChildren<Text>(true);
             for (var index = 0; index < texts.Length; index++)

@@ -18,6 +18,10 @@ namespace WeatherManager
         [SerializeField] private float idleDegreesPerSecond = 8f;
         [SerializeField] private float maximumDegreesPerSecond = 260f;
         private WorldBuilder world;
+        private GameManager manager;
+        private float currentSpeed;
+        private Quaternion initialRotation;
+        private bool captured;
 
         public void Configure(
             AngeEnvironmentalMotion motionMode,
@@ -46,13 +50,20 @@ namespace WeatherManager
             // coordinates. In MR this landmark is physically translated and
             // scaled with that island, so its scene-space position is meters,
             // not a valid simulation sample coordinate.
+            manager ??= FindFirstObjectByType<GameManager>();
+            var delta = Mathf.Min(Time.unscaledDeltaTime, .05f) * (manager != null ? manager.TimeScale : 1);
+            if (delta <= 0) return;
+            if (!captured) { initialRotation = rotor.localRotation; captured = true; }
             var hazard = simulation.Sample(GetGameplayPosition());
             var intensity = motion == AngeEnvironmentalMotion.WindRotor
                 ? Mathf.Clamp01(hazard.Wind)
                 : Mathf.Clamp01(hazard.Flood * 1.35f + hazard.Moisture * 0.3f);
             var speed = Mathf.Lerp(idleDegreesPerSecond, maximumDegreesPerSecond, intensity);
-            rotor.Rotate(localAxis, speed * Time.deltaTime, Space.Self);
+            currentSpeed = Mathf.Lerp(currentSpeed, speed, 1f - Mathf.Exp(-delta * 1.8f));
+            rotor.Rotate(localAxis, currentSpeed * delta, Space.Self);
         }
+
+        public void ResetMotion() { currentSpeed = 0; if (captured && rotor != null) rotor.localRotation = initialRotation; }
 
         private Vector3 GetGameplayPosition()
         {

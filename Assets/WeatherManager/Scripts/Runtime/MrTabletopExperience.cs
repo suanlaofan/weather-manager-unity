@@ -28,12 +28,16 @@ namespace WeatherManager
         [SerializeField, Min(0.005f)] private float tabletopSurfaceClearance = 0.015f;
         [SerializeField, Min(0.1f)] private float minimumTableArea = 0.16f;
 
-        [Header("Head-locked dashboard (meters)")]
-        [SerializeField] private Vector3 headLockedDashboardLocalPosition = new Vector3(0f, -0.16f, 1.12f);
-        // This is a physical meters-per-logical-pixel value, not a mirror-window
-        // scale.  Keeping the authored dashboard at 1440x900 means 0.00124 is
-        // an exact 2x increase from the previous 0.00062 XR presentation.
-        [SerializeField, Range(0.0004f, 0.0025f)] private float headLockedDashboardScale = 0.00124f;
+        [Header("Emulator initial framing (meters)")]
+        [SerializeField, Range(1.25f, 2f)] private float emulatorTabletopDistance = 1.42f;
+        [SerializeField, Range(0.35f, 0.85f)] private float emulatorTabletopEyeDrop = 0.62f;
+
+        [Header("World anchored dashboard (meters)")]
+        [SerializeField, Range(0.9f, 1.6f)] private float dashboardDistance = 1.2f;
+        [SerializeField, Range(-0.5f, -0.1f)] private float dashboardHeightOffset = -0.12f;
+        private bool dashboardPlaced;
+        private bool recallWasPressed;
+        private bool editorPreviewActive;
 
         private InputDevice rightController;
         private InputDevice leftController;
@@ -44,11 +48,19 @@ namespace WeatherManager
         private bool tabletopPlacedOnPhysicalPlane;
         private bool emulatorFallbackFollowsHead;
         private RaycastHit[] tabletopRaycastHits;
+        private Vector3 viewHomePosition, viewHomeScale, viewDepthDirection, viewTargetPosition;
+        private Quaternion viewHomeRotation, viewTargetRotation;
+        private float viewScale = 1f, viewYaw, viewDepthOffset, viewHomeDistance;
+        private bool viewHomeCaptured, viewAnimating, viewManuallyAdjusted;
 
         public bool IsMrActive { get; private set; }
         public Transform TabletopIsland => tabletopIsland;
         public bool IsPlacedOnPhysicalPlane => tabletopPlacedOnPhysicalPlane;
-        public bool AllowsEmulatorMouseCasting => IsMrActive && MrRuntimeBridge.IsPicoEmulator;
+        public bool AllowsEmulatorMouseCasting => IsMrActive && (MrRuntimeBridge.IsPicoEmulator || editorPreviewActive);
+        public int ViewScalePercent => Mathf.RoundToInt(viewScale * 100);
+        public float ViewYaw => viewYaw;
+        public float ViewDistance => tabletopIsland != null && hmdCamera != null
+            ? Vector3.ProjectOnPlane(tabletopIsland.position - hmdCamera.transform.position, Vector3.up).magnitude : 0f;
 
         private IEnumerator Start()
         {
@@ -74,14 +86,50 @@ namespace WeatherManager
                 yield break;
             }
 
-            // Let the loader and TrackedPoseDriver publish at least one HMD
-            // pose before deriving the fallback tabletop position. We never
-            // overwrite the tracked camera transform here: that would fight
-            // the real headset pose and was the source of the off-screen
-            // default island in the emulator.
-            yield return new WaitForEndOfFrame();
-            yield return null;
+            // The loader becomes active before the session is focused. On a
+            // fresh emulator the permission dialog can keep the camera at
+            // (0,0,0) and the eye buffers at 0x0 for several seconds. Anchoring
+            // there leaves the island on the floor once tracking starts.
+            // Wait for a rendered, settled pose before placing either anchor.
+            yield return WaitForInitialXrPose();
             ActivateMixedReality();
+        }
+
+        private IEnumerator WaitForInitialXrPose()
+        {
+            var readySeconds = 0f;
+            var stableSeconds = 0f;
+            var previousPosition = hmdCamera != null ? hmdCamera.transform.position : Vector3.zero;
+            var previousRotation = hmdCamera != null ? hmdCamera.transform.rotation : Quaternion.identity;
+            while (true)
+            {
+                yield return new WaitForEndOfFrame();
+                var rendered = XRSettings.isDeviceActive && XRSettings.eyeTextureWidth > 0
+                    && XRSettings.eyeTextureHeight > 0 && hmdCamera != null && Application.isFocused;
+                if (!rendered)
+                {
+                    readySeconds = stableSeconds = 0f;
+                    continue;
+                }
+                readySeconds += Mathf.Min(Time.unscaledDeltaTime, .1f);
+                var position = hmdCamera.transform.position;
+                var rotation = hmdCamera.transform.rotation;
+                var device = InputDevices.GetDeviceAtXRNode(XRNode.Head);
+                var tracked = device.isValid && device.TryGetFeatureValue(CommonUsages.isTracked, out var isTracked) && isTracked;
+                var stable = Vector3.Distance(previousPosition, position) < .015f
+                    && Quaternion.Angle(previousRotation, rotation) < 1.5f;
+                stableSeconds = stable ? stableSeconds + Mathf.Min(Time.unscaledDeltaTime, .1f) : 0f;
+                previousPosition = position;
+                previousRotation = rotation;
+                // Allow natural head movement, and providers that publish a
+                // valid rendered camera without exposing the isTracked bit.
+                if ((tracked && (stableSeconds >= .35f || readySeconds >= 2f)) || readySeconds >= 3f)
+                {
+                    Debug.Log($"WEATHER_MANAGER_INITIAL_POSE_READY:tracked={tracked}:head={position:F2}:"
+                        + $"eyeTexture={XRSettings.eyeTextureWidth}x{XRSettings.eyeTextureHeight}:wait={readySeconds:F2}");
+                    yield break;
+                }
+            }
         }
 
         private void Update()
@@ -91,7 +139,64 @@ namespace WeatherManager
                 return;
             }
 
+            ReadDashboardRecall();
             ReadWeatherSelector();
+            AnimateTabletopView();
+        }
+
+        private void CaptureViewHome()
+        {
+            if (tabletopIsland == null || hmdCamera == null) return;
+            viewHomePosition = tabletopIsland.position;
+            viewHomeRotation = tabletopIsland.rotation;
+            viewHomeScale = tabletopIsland.localScale;
+            var depth = Vector3.ProjectOnPlane(viewHomePosition - hmdCamera.transform.position, Vector3.up);
+            viewHomeDistance = depth.magnitude;
+            viewDepthDirection = depth.sqrMagnitude > .0001f ? depth.normalized : Vector3.forward;
+            viewScale = 1f; viewYaw = viewDepthOffset = 0f;
+            viewHomeCaptured = true; viewAnimating = viewManuallyAdjusted = false;
+        }
+
+        /// <summary>Adjust only the island. Tracking and the independently anchored dashboard stay untouched.</summary>
+        public void AdjustTabletopView(DashboardAction action)
+        {
+            if (!IsMrActive || !viewHomeCaptured) return;
+            switch (action)
+            {
+                case DashboardAction.Shrink: viewScale = Mathf.Clamp(viewScale - .1f, .5f, 1.6f); break;
+                case DashboardAction.Enlarge: viewScale = Mathf.Clamp(viewScale + .1f, .5f, 1.6f); break;
+                case DashboardAction.TurnLeft: viewYaw -= 15f; break;
+                case DashboardAction.TurnRight: viewYaw += 15f; break;
+                case DashboardAction.BringCloser: viewDepthOffset = Mathf.Clamp(viewDepthOffset - .1f, .85f - viewHomeDistance, 3f - viewHomeDistance); break;
+                case DashboardAction.MoveFarther: viewDepthOffset = Mathf.Clamp(viewDepthOffset + .1f, .85f - viewHomeDistance, 3f - viewHomeDistance); break;
+                case DashboardAction.ResetView: viewScale = 1f; viewYaw = viewDepthOffset = 0f; break;
+                default: return;
+            }
+            FindFirstObjectByType<WeatherCastingController>()?.SuspendInput();
+            viewYaw = Mathf.Repeat(viewYaw + 180f, 360f) - 180f;
+            viewTargetPosition = viewHomePosition + viewDepthDirection * viewDepthOffset;
+            viewTargetRotation = viewHomeRotation * Quaternion.Euler(0, viewYaw, 0);
+            viewAnimating = viewManuallyAdjusted = true;
+            Debug.Log($"WEATHER_MANAGER_TABLETOP_VIEW:{action}:size={ViewScalePercent}:yaw={viewYaw:0}:distance={viewHomeDistance + viewDepthOffset:F2}");
+        }
+
+        private void AnimateTabletopView()
+        {
+            if (!viewAnimating || tabletopIsland == null) return;
+            // Unscaled time keeps the controls available while the simulation is paused.
+            var blend = 1f - Mathf.Exp(-18f * Time.unscaledDeltaTime);
+            var targetScale = viewHomeScale * viewScale;
+            tabletopIsland.position = Vector3.Lerp(tabletopIsland.position, viewTargetPosition, blend);
+            tabletopIsland.rotation = Quaternion.Slerp(tabletopIsland.rotation, viewTargetRotation, blend);
+            tabletopIsland.localScale = Vector3.Lerp(tabletopIsland.localScale, targetScale, blend);
+            if (Vector3.Distance(tabletopIsland.position, viewTargetPosition) < .0001f
+                && Quaternion.Angle(tabletopIsland.rotation, viewTargetRotation) < .02f
+                && Vector3.Distance(tabletopIsland.localScale, targetScale) < .00001f)
+            {
+                tabletopIsland.SetPositionAndRotation(viewTargetPosition, viewTargetRotation);
+                tabletopIsland.localScale = targetScale;
+                viewAnimating = false;
+            }
         }
 
         public void Configure(Transform island, Transform dashboard, Camera camera, UIController uiController)
@@ -128,6 +233,7 @@ namespace WeatherManager
             }
 
             if (!rightController.isValid
+                || !rightController.TryGetFeatureValue(CommonUsages.isTracked, out var tracked) || !tracked
                 || !rightController.TryGetFeatureValue(CommonUsages.devicePosition, out var localPosition)
                 || !rightController.TryGetFeatureValue(CommonUsages.deviceRotation, out var localRotation))
             {
@@ -241,7 +347,7 @@ namespace WeatherManager
                 // so preserve an opaque Unity sky there and reserve VST for a
                 // retail PICO session.
                 hmdCamera.backgroundColor = MrRuntimeBridge.IsPicoEmulator
-                    ? new Color(0.48f, 0.76f, 0.86f, 1f)
+                    ? new Color(0.38f, 0.51f, 0.54f, 1f)
                     : new Color(0f, 0f, 0f, 0f);
             }
 
@@ -256,8 +362,8 @@ namespace WeatherManager
             // while the headset is still discovering planes. It is replaced as
             // soon as a suitable physical tabletop arrives from PICO Sense.
             PlaceFallbackTabletop();
-            PositionHeadLockedDashboard();
-            ui?.ConfigureSpatialDashboard(hmdCamera, spatialDashboard, transform, headLockedDashboardScale);
+            PlaceSpatialDashboardIfNeeded();
+            ui?.ConfigureSpatialDashboard(hmdCamera, spatialDashboard, transform, SpatialWeatherDashboard.MetersPerUnit);
             if (usePassthrough)
             {
                 BeginPlaneDetection();
@@ -267,7 +373,7 @@ namespace WeatherManager
                 Debug.Log(
                     $"WEATHER_MANAGER_PICO_EMULATOR_VIEW_READY:tabletop=fallback:"
                     + $"passthrough=False:anchor={tabletopAnchor?.position:F2}:"
-                    + $"uiScale={headLockedDashboardScale:0.00000}");
+                    + $"uiScale={SpatialWeatherDashboard.MetersPerUnit:0.00000}");
             }
             Debug.Log(
                 $"WEATHER_MANAGER_PICO_INPUT_MODE:model={SystemInfo.deviceModel}:"
@@ -276,7 +382,7 @@ namespace WeatherManager
             Debug.Log(
                 $"WEATHER_MANAGER_PICO_MR_ACTIVE:passthrough={usePassthrough}:"
                 + $"planeDetection={(usePassthrough ? "requested" : "emulator-disabled")}"
-                + $":headLockedUi=True:emulator={MrRuntimeBridge.IsPicoEmulator}"
+                + $":headLockedUi=False:emulator={MrRuntimeBridge.IsPicoEmulator}"
                 + $":eyeTexture={XRSettings.eyeTextureWidth}x{XRSettings.eyeTextureHeight}");
         }
 
@@ -284,13 +390,10 @@ namespace WeatherManager
         {
             tabletopPlacedOnPhysicalPlane = false;
 
-            // The PICO emulator continues to revise its synthetic HMD pose for
-            // several frames after XRSettings becomes active.  We still use
-            // the first published pose to choose a comfortable initial view,
-            // but the tabletop must remain world-locked afterwards.  Parenting
-            // it to the HMD made the complete island rotate and translate with
-            // the user's head, which prevented a natural look-around review.
-            // Only the dashboard is allowed to follow the HMD.
+            // Initial tracking has settled before reaching this branch. Move
+            // the scene closer while retaining enough margin for the complete
+            // 104 x 72 island in the emulator's wide eye projection. Neither
+            // the scene nor UI follows subsequent head movement.
             if (MrRuntimeBridge.IsPicoEmulator && hmdCamera != null && tabletopAnchor != null)
             {
                 var horizontalForward = Vector3.ProjectOnPlane(hmdCamera.transform.forward, Vector3.up);
@@ -306,8 +409,8 @@ namespace WeatherManager
                 tabletopAnchor.SetParent(transform, true);
                 tabletopAnchor.SetPositionAndRotation(
                     hmdCamera.transform.position
-                    + horizontalForward * 1.72f
-                    + Vector3.down * 0.24f,
+                    + horizontalForward * emulatorTabletopDistance
+                    + Vector3.down * emulatorTabletopEyeDrop,
                     Quaternion.LookRotation(horizontalForward, Vector3.up));
                 emulatorFallbackFollowsHead = false;
 
@@ -318,11 +421,13 @@ namespace WeatherManager
                     tabletopIsland.localScale = Vector3.one * tabletopScale;
                 }
 
-                PositionHeadLockedDashboard();
+                PlaceSpatialDashboardIfNeeded();
+                CaptureViewHome();
                 Debug.Log(
                     $"WEATHER_MANAGER_PICO_EMULATOR_TABLETOP_WORLD_LOCKED:"
                     + $"position={tabletopAnchor.position:F2}:forward={horizontalForward:F2}:"
-                    + $"scale={tabletopScale:0.000}");
+                    + $"scale={tabletopScale:0.000}:head={hmdCamera.transform.position:F2}:"
+                    + $"distance={emulatorTabletopDistance:F2}:eyeDrop={emulatorTabletopEyeDrop:F2}");
                 return;
             }
 
@@ -361,7 +466,8 @@ namespace WeatherManager
                 tabletopIsland.localScale = Vector3.one * tabletopScale;
             }
 
-            PositionHeadLockedDashboard();
+            PlaceSpatialDashboardIfNeeded();
+            CaptureViewHome();
         }
 
         private async void BeginPlaneDetection()
@@ -381,7 +487,7 @@ namespace WeatherManager
 
         private void OnPlaneDetectionDataUpdated(List<PxrPlaneData> planes)
         {
-            if (!IsMrActive || tabletopAnchor == null || planes == null)
+            if (!IsMrActive || tabletopAnchor == null || planes == null || tabletopPlacedOnPhysicalPlane || viewManuallyAdjusted)
             {
                 return;
             }
@@ -455,27 +561,88 @@ namespace WeatherManager
                 tabletopIsland.localScale = Vector3.one * tabletopScale;
             }
 
-            PositionHeadLockedDashboard();
+            PlaceSpatialDashboardIfNeeded();
+            CaptureViewHome();
             Debug.Log(
                 $"WEATHER_MANAGER_MR_TABLE_PLACED:label={plane.label}:area={score:0.00}:"
                 + $"position={plane.position:F2}");
         }
 
-        private void PositionHeadLockedDashboard()
+        private void PlaceSpatialDashboardIfNeeded()
         {
-            if (spatialDashboard == null || hmdCamera == null)
-            {
-                return;
-            }
-
-            // Parenting to the tracked HMD is intentional: this dashboard is
-            // navigation/status UI, not a world prop. Its physical size stays
-            // fixed in meters and no mirror-window aspect is involved.
-            spatialDashboard.SetParent(hmdCamera.transform, false);
-            spatialDashboard.localPosition = headLockedDashboardLocalPosition;
-            spatialDashboard.localRotation = Quaternion.identity;
-            spatialDashboard.localScale = Vector3.one;
+            if (dashboardPlaced || spatialDashboard == null || hmdCamera == null) return;
+            PlaceSpatialDashboard();
         }
+
+        private void PlaceSpatialDashboard()
+        {
+            var forward = Vector3.ProjectOnPlane(hmdCamera.transform.forward, Vector3.up).normalized;
+            if (forward.sqrMagnitude < 0.001f) forward = Vector3.forward;
+            var position = hmdCamera.transform.position + forward * dashboardDistance + Vector3.up * dashboardHeightOffset;
+            Physics.SyncTransforms();
+            // Placement is the only time occlusion avoidance runs. Head motion never drives this anchor.
+            for (var attempt = 0; attempt < 4; attempt++)
+            {
+                var pose = Quaternion.LookRotation(position - hmdCamera.transform.position, Vector3.up);
+                if (!DashboardObscured(position, pose)) break;
+                position += Vector3.up * .06f;
+            }
+            spatialDashboard.SetParent(transform, true);
+            spatialDashboard.SetPositionAndRotation(position, Quaternion.LookRotation(position - hmdCamera.transform.position, Vector3.up));
+            var parentScale = transform.lossyScale;
+            spatialDashboard.localScale = new Vector3(1f / Mathf.Max(.0001f, parentScale.x),
+                1f / Mathf.Max(.0001f, parentScale.y), 1f / Mathf.Max(.0001f, parentScale.z));
+            dashboardPlaced = true;
+        }
+
+        private bool DashboardObscured(Vector3 center, Quaternion rotation)
+        {
+            if (tabletopIsland == null || hmdCamera == null) return false;
+            tabletopRaycastHits ??= new RaycastHit[32];
+            var visibleGeometry = tabletopIsland.GetComponentsInChildren<MeshRenderer>();
+            for (var x = -1; x <= 1; x++) for (var y = -1; y <= 1; y++)
+            {
+                var target = center + rotation * new Vector3(x * .39f, y * SpatialWeatherDashboard.LogicalSize.y * .0005f, 0);
+                var direction = target - hmdCamera.transform.position;
+                var count = Physics.RaycastNonAlloc(new Ray(hmdCamera.transform.position, direction.normalized),
+                    tabletopRaycastHits, direction.magnitude - .015f, ~(1 << 5), QueryTriggerInteraction.Ignore);
+                for (var i = 0; i < count; i++)
+                    if (tabletopRaycastHits[i].transform.IsChildOf(tabletopIsland)) return true;
+                // Some authored scenery has no collider. Its bounds still prevent an initial UI overlap.
+                var ray = new Ray(hmdCamera.transform.position, direction.normalized);
+                foreach (var mesh in visibleGeometry)
+                    if (mesh.enabled && mesh.bounds.IntersectRay(ray, out var distance) && distance > 0 && distance < direction.magnitude - .015f) return true;
+            }
+            return false;
+        }
+
+        public void RecallDashboard()
+        {
+            if (spatialDashboard == null || hmdCamera == null || (ui != null && ui.SpatialPanel != null && ui.SpatialPanel.IsDragging)) return;
+            FindFirstObjectByType<WeatherCastingController>()?.SuspendInput();
+            PlaceSpatialDashboard();
+        }
+
+        private void ReadDashboardRecall()
+        {
+            if (!leftController.isValid) leftController = InputDevices.GetDeviceAtXRNode(XRNode.LeftHand);
+            var pressed = leftController.isValid && leftController.TryGetFeatureValue(CommonUsages.primaryButton, out var down) && down;
+            if (pressed && !recallWasPressed) RecallDashboard();
+            recallWasPressed = pressed;
+        }
+
+#if UNITY_EDITOR
+        public void BeginEditorPreview()
+        {
+            editorPreviewActive = true;
+            IsMrActive = true;
+            dashboardPlaced = false;
+            var desktop = FindFirstObjectByType<CameraController>();
+            if (desktop != null) desktop.enabled = false;
+            PlaceFallbackTabletop();
+            ui?.ConfigureSpatialDashboard(hmdCamera, spatialDashboard, transform, SpatialWeatherDashboard.MetersPerUnit);
+        }
+#endif
 
         private void OnDisable()
         {
