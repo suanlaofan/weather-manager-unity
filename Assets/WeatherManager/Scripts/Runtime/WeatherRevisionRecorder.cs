@@ -73,34 +73,34 @@ namespace WeatherManager.Editor
         }
         private IEnumerator Sequence()
         {
-            status.segment="空间控制台 · Editor 鼠标与视角预览";yield return new WaitForSeconds(3);
+            status.segment="Spatial panel · Editor mouse and view preview";yield return new WaitForSeconds(3);
             foreach(var action in new[]{DashboardAction.Enlarge,DashboardAction.Shrink,DashboardAction.TurnLeft,DashboardAction.TurnRight,DashboardAction.BringCloser,DashboardAction.MoveFarther})
             {
-                status.segment=action switch {DashboardAction.Enlarge=>"放大按钮 · 整体沙盘放大",DashboardAction.Shrink=>"缩小按钮 · 整体沙盘缩小",DashboardAction.TurnLeft=>"左转按钮 · 查看场景侧面",DashboardAction.TurnRight=>"右转按钮 · 调整观察方向",DashboardAction.BringCloser=>"拉近按钮 · 沙盘向玩家移动",_=>"推远按钮 · 留出整体观察空间"};
+                status.segment=action switch {DashboardAction.Enlarge=>"Larger · Enlarge the whole table",DashboardAction.Shrink=>"Smaller · Shrink the whole table",DashboardAction.TurnLeft=>"Left · View the side of the scene",DashboardAction.TurnRight=>"Right · Change the viewing angle",DashboardAction.BringCloser=>"Closer · Move the table toward the player",_=>"Farther · Make room for an overview"};
                 panel.Invoke(action);panel.Invoke(action);yield return new WaitForSeconds(2.5f);
             }
             panel.Invoke(DashboardAction.Enlarge);panel.Invoke(DashboardAction.TurnRight);panel.Invoke(DashboardAction.BringCloser);yield return new WaitForSeconds(2);
-            panel.Invoke(DashboardAction.ResetView);status.segment="视角复位 · 保留天气进度，恢复沙盘位置与大小";yield return new WaitForSeconds(2);
-            panel.Invoke(DashboardAction.Details);status.segment="详情页 · 常用信息集中阅读";yield return new WaitForSeconds(2);
-            panel.Invoke(DashboardAction.Settings);status.segment="设置页 · 独立操作面板";yield return new WaitForSeconds(2);
+            panel.Invoke(DashboardAction.ResetView);status.segment="Reset view · Keep weather progress, restore table position and size";yield return new WaitForSeconds(2);
+            panel.Invoke(DashboardAction.Details);status.segment="Details · Key stats at a glance";yield return new WaitForSeconds(2);
+            panel.Invoke(DashboardAction.Settings);status.segment="Settings · Standalone control panel";yield return new WaitForSeconds(2);
             panel.Invoke(DashboardAction.Home);
-            yield return ArtView(new Vector3(72,70,-91),Vector3.zero,"Low-poly 全景 · 分层海岸与连通聚落");
-            yield return ArtView(new Vector3(20,24,-29),new Vector3(0,2,-2),"村庄近景 · 建筑基座、步道、花园与居民");
-            yield return ArtView(new Vector3(-20,20,-38),new Vector3(-30,2,-16),"农田近景 · 三种作物与独立风车叶片");
-            yield return ArtView(new Vector3(43,13,-26),new Vector3(31,1,-10),"湖岸近景 · 桥梁支撑、水轮与水面动画");
+            yield return ArtView(new Vector3(72,70,-91),Vector3.zero,"Low-poly overview · Layered coast and connected settlements");
+            yield return ArtView(new Vector3(20,24,-29),new Vector3(0,2,-2),"Village close-up · Foundations, paths, gardens and residents");
+            yield return ArtView(new Vector3(-20,20,-38),new Vector3(-30,2,-16),"Farm close-up · Three crops and spinning windmill blades");
+            yield return ArtView(new Vector3(43,13,-26),new Vector3(31,1,-10),"Lakeshore close-up · Bridge supports, water wheel and animated water");
             foreach(var type in new[]{WeatherType.Wind,WeatherType.Rain,WeatherType.Electric,WeatherType.Snow})
             {
                 manager.ResetWorld();var point=Center(type==WeatherType.Wind?BiomeType.Forest:type==WeatherType.Rain?BiomeType.Lowland:BiomeType.Town);CloseView(point);
-                yield return Cast(type,point,type==WeatherType.Electric?8:11,type+" · 施法、地表接触与灾害发展");
-                status.segment=type+" · 松开后自然消散";yield return new WaitForSeconds(3);
+                yield return Cast(type,point,type==WeatherType.Electric?8:11,type+" · Casting, ground contact and disaster growth");
+                status.segment=type+" · Fades naturally after release";yield return new WaitForSeconds(3);
             }
             manager.ResetWorld();var forest=Center(BiomeType.Forest);CloseView(forest);
-            yield return Cast(WeatherType.Heat,forest,11,"高温 · 干燥、起火与烟雾");
-            yield return Cast(WeatherType.Wind,forest,9,"火场加风 · 连续旋涡与火龙卷");
-            yield return Cast(WeatherType.Rain,forest,12,"降雨灭火 · 蒸汽、湿地与消散");
-            status.segment="停止施法 · 尾迹保留";yield return new WaitForSeconds(5);
+            yield return Cast(WeatherType.Heat,forest,11,"Heat · Drought, ignition and smoke");
+            yield return Cast(WeatherType.Wind,forest,9,"Wind on fire · Sustained vortex and fire tornado");
+            yield return Cast(WeatherType.Rain,forest,12,"Rain on fire · Steam, wet ground and fade-out");
+            status.segment="Cast stopped · Trails linger";yield return new WaitForSeconds(5);
             manager.ResetWorld();camera.transform.SetPositionAndRotation(new Vector3(0,1.62f,0),Quaternion.identity);mr.BeginEditorPreview();camera.transform.rotation=Quaternion.Euler(25,0,0);camera.fieldOfView=70;panel.Canvas.enabled=true;
-            status.segment="重置完成 · 面板和沙盘保持独立";yield return new WaitForSeconds(3);
+            status.segment="Reset complete · Panel and table stay independent";yield return new WaitForSeconds(3);
             recording=false;
         }
         private void OnGUI()
@@ -108,7 +108,7 @@ namespace WeatherManager.Editor
             if(!recording)return;
             var style=new GUIStyle(GUI.skin.label) {font=font,fontSize=25,alignment=TextAnchor.MiddleLeft};style.normal.textColor=Color.white;
             GUI.Box(new Rect(18,16,Screen.width-36,46),GUIContent.none);
-            GUI.Label(new Rect(34,16,Screen.width-68,46),"EDITOR 运行画面  |  "+status.segment,style);
+            GUI.Label(new Rect(34,16,Screen.width-68,46),"EDITOR PLAYBACK  |  "+status.segment,style);
         }
         private void OnDestroy() {recording=false;if(timing!=null){timing.Dispose();timing=null;}}
     }

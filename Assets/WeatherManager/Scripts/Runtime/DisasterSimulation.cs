@@ -147,10 +147,10 @@ namespace WeatherManager
                     LocalizationService.Biome(biome),
                     LocalizationService.Hazard(biome.Type))
                 : wetGround
-                    ? LocalizationService.Message("event.lightning_wet_suppressed", LocalizationService.Biome(biome))
+                    ? LocalizationService.Message("event.lightning_wet_suppressed", LocalizationService.BiomeInline(biome))
                     : biome.Type == BiomeType.Highland
                         ? LocalizationService.Message("event.lightning_highland_rockfall")
-                        : LocalizationService.Message("event.lightning_damaged", LocalizationService.Biome(biome));
+                        : LocalizationService.Message("event.lightning_damaged", LocalizationService.BiomeInline(biome));
             DisasterEvent?.Invoke(message, WeatherPalette.Electric);
         }
 
@@ -980,11 +980,11 @@ namespace WeatherManager
                 : hazard.Flood > 0.34f
                     ? LocalizationService.Message("event.collapse_flood", LocalizationService.Biome(biome))
                     : hazard.Wind > 0.34f
-                        ? LocalizationService.Message("event.collapse_wind", LocalizationService.Biome(biome))
+                        ? LocalizationService.Message("event.collapse_wind", LocalizationService.BiomeInline(biome))
                         : hazard.Fire > 0.12f || wasBurning
                             ? LocalizationService.Message("event.collapse_fire", LocalizationService.Biome(biome))
                             : hazard.Electric > 0.1f
-                                ? LocalizationService.Message("event.collapse_lightning", LocalizationService.Biome(biome))
+                                ? LocalizationService.Message("event.collapse_lightning", LocalizationService.BiomeInline(biome))
                                 : LocalizationService.Message("event.collapse_generic");
             var color = snowCollapse
                 ? WeatherPalette.Snow
@@ -1147,7 +1147,7 @@ namespace WeatherManager
                         ? LocalizationService.Message("event.flood_farmland")
                         : floodedBiome.Type == BiomeType.Town
                             ? LocalizationService.Message("event.flood_town")
-                            : LocalizationService.Message("event.flood_generic", LocalizationService.Biome(floodedBiome));
+                            : LocalizationService.Message("event.flood_generic", LocalizationService.BiomeInline(floodedBiome));
                 DisasterEvent?.Invoke(floodMessage, WeatherPalette.Rain);
             }
             else if (stats.FloodedCells < 4 && floodEventActive)
@@ -1203,7 +1203,7 @@ namespace WeatherManager
                     BiomeType.Town => LocalizationService.Message("event.fire_town"),
                     BiomeType.Highland => LocalizationService.Message("event.fire_highland"),
                     BiomeType.Lowland => LocalizationService.Message("event.fire_lowland"),
-                    _ => LocalizationService.Message("event.fire_generic", LocalizationService.Biome(fireBiome))
+                    _ => LocalizationService.Message("event.fire_generic", LocalizationService.BiomeInline(fireBiome))
                 };
                 DisasterEvent?.Invoke(fireMessage, WeatherPalette.Heat);
                 if (strongestFireIndex >= 0)

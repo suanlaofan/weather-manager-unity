@@ -727,7 +727,6 @@ namespace WeatherManager
             if (chineseButton != null)
             {
                 chineseButton.onClick.RemoveAllListeners();
-                chineseButton.onClick.AddListener(() => LocalizationService.SetLanguage(AppLanguage.Chinese));
             }
             if (englishButton != null)
             {
@@ -783,48 +782,9 @@ namespace WeatherManager
 
         private void EnsureLanguageControl()
         {
-            var topBand = FindComponent<RectTransform>("TopBand");
-            if (topBand == null) return;
-            if (languageControl == null)
-            {
-                var controlObject = new GameObject("LanguageControl");
-                controlObject.transform.SetParent(topBand, false);
-                var background = controlObject.AddComponent<Image>();
-                background.color = new Color(0.055f, 0.095f, 0.105f, 0.98f);
-                languageControl = background.rectTransform;
-            }
-
-            if (chineseButton == null)
-            {
-                chineseButton = CreateButton(
-                    "中",
-                    languageControl,
-                    () => LocalizationService.SetLanguage(AppLanguage.Chinese),
-                    IdleButtonColor,
-                    13);
-                chineseButton.gameObject.name = "ChineseButton";
-            }
-            if (englishButton == null)
-            {
-                englishButton = CreateButton(
-                    "EN",
-                    languageControl,
-                    () => LocalizationService.SetLanguage(AppLanguage.English),
-                    IdleButtonColor,
-                    11);
-                englishButton.gameObject.name = "EnglishButton";
-            }
-
-            var chineseRect = chineseButton.GetComponent<RectTransform>();
-            chineseRect.anchorMin = new Vector2(0f, 0f);
-            chineseRect.anchorMax = new Vector2(0.5f, 1f);
-            chineseRect.offsetMin = new Vector2(2f, 2f);
-            chineseRect.offsetMax = new Vector2(-1f, -2f);
-            var englishRect = englishButton.GetComponent<RectTransform>();
-            englishRect.anchorMin = new Vector2(0.5f, 0f);
-            englishRect.anchorMax = new Vector2(1f, 1f);
-            englishRect.offsetMin = new Vector2(1f, 2f);
-            englishRect.offsetMax = new Vector2(-2f, -2f);
+            // The game ships English-only, so the legacy language toggle is never shown.
+            languageControl ??= FindComponent<RectTransform>("LanguageControl");
+            if (languageControl != null) languageControl.gameObject.SetActive(false);
         }
 
         private void LayoutTopBarControls()
@@ -862,7 +822,7 @@ namespace WeatherManager
         private void ApplyLocalizedFont()
         {
             if (canvas == null || !Application.isPlaying) return;
-            if (localizedRuntimeFont == null || !localizedRuntimeFont.HasCharacter('中'))
+            if (localizedRuntimeFont == null || !localizedRuntimeFont.HasCharacter('W'))
             {
                 localizedRuntimeFont = Font.CreateDynamicFontFromOSFont(
                     new[] { "PingFang SC", "Arial Unicode MS", "Heiti SC", "Songti SC", "Arial" },
@@ -871,7 +831,7 @@ namespace WeatherManager
 
             var bundledFont = Resources.Load<Font>("WeatherManager/Fonts/NotoSansCJKsc-Regular");
             var targetFont = bundledFont != null ? bundledFont
-                : localizedRuntimeFont != null && localizedRuntimeFont.HasCharacter('中') ? localizedRuntimeFont : font;
+                : localizedRuntimeFont != null && localizedRuntimeFont.HasCharacter('W') ? localizedRuntimeFont : font;
             if (targetFont == null) return;
             var texts = canvas.GetComponentsInChildren<Text>(true);
             for (var index = 0; index < texts.Length; index++)
@@ -897,10 +857,7 @@ namespace WeatherManager
             }
             SetButtonLabel(soundButton, LocalizationService.Text(soundEnabled ? "button.sound" : "button.muted"));
             SetButtonLabel(resetButton, LocalizationService.Text("button.reset"));
-            SetButtonLabel(chineseButton, "中");
-            SetButtonLabel(englishButton, "EN");
-            SetButtonActive(chineseButton, LocalizationService.Current == AppLanguage.Chinese, new Color(0.78f, 0.28f, 0.2f));
-            SetButtonActive(englishButton, LocalizationService.Current == AppLanguage.English, new Color(0.22f, 0.62f, 0.78f));
+            EnsureLanguageControl();
             if (lastStats != null)
             {
                 Refresh(lastStats, lastWeather, lastTimeScale, lastSeason, lastPhase);

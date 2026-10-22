@@ -6341,7 +6341,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1.08
-  m_Text: "\u4E8B\u4EF6\u8BB0\u5F55\n\u6682\u65E0\u707E\u5BB3\u4E8B\u4EF6"
+  m_Text: "EVENT LOG\nNo active incidents"
 --- !u!1 &51482051
 GameObject:
   m_ObjectHideFlags: 0
@@ -6971,7 +6971,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u7F29\u5C0F \u2212"
+  m_Text: Smaller
 --- !u!222 &53403089
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -7732,7 +7732,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u4E2D"
+  m_Text: ""
 --- !u!222 &59946030
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -28131,7 +28131,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u98CE"
+  m_Text: Wind
 --- !u!222 &162163593
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -34943,7 +34943,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u5C06\u6062\u590D\u57CE\u9547\u5E76\u6E05\u9664\u5F53\u524D\u707E\u5BB3\u3002\n\u786E\u5B9A\u91CD\u7F6E\u5417\uFF1F"
+  m_Text: "Restore the town and clear all disasters?\nThis resets the current simulation."
 --- !u!222 &178722778
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -50047,7 +50047,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u5F53\u524D"
+  m_Text: CURRENT
 --- !u!1 &214948415
 GameObject:
   m_ObjectHideFlags: 0
@@ -56120,7 +56120,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u62C9\u8FD1"
+  m_Text: Closer
 --- !u!222 &223642183
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -68110,7 +68110,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u96EA"
+  m_Text: Snow
 --- !u!222 &284304690
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -73595,7 +73595,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u964D\u96EA"
+  m_Text: Snow
 --- !u!222 &323165536
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -77192,7 +77192,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u91CD\u7F6E\u57CE\u9547"
+  m_Text: Reset town
 --- !u!222 &351411737
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -104035,7 +104035,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u63A8\u8FDC"
+  m_Text: Farther
 --- !u!222 &443079187
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -113090,7 +113090,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u663C\u591C"
+  m_Text: LIGHT
 --- !u!1 &513583611
 GameObject:
   m_ObjectHideFlags: 0
@@ -152843,7 +152843,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u57CE\u5E02\u72B6\u6001"
+  m_Text: CITY STATUS
 --- !u!1 &641789246
 GameObject:
   m_ObjectHideFlags: 0
@@ -159364,7 +159364,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u67E5\u770B\u4E8B\u4EF6\u8BB0\u5F55"
+  m_Text: Event history
 --- !u!222 &695122710
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -167817,7 +167817,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u5DE6\u8F6C"
+  m_Text: Left
 --- !u!222 &748218617
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -174910,7 +174910,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u5927\u98CE"
+  m_Text: Wind
 --- !u!222 &767896088
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -198880,7 +198880,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u53EC\u56DE\u9762\u677F"
+  m_Text: Recall panel
 --- !u!222 &877872631
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -211869,7 +211869,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u58F0\u97F3"
+  m_Text: Sound
 --- !u!1001 &899927583
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -217499,7 +217499,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u767D\u5929"
+  m_Text: Day
 --- !u!222 &905400439
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -218629,7 +218629,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u4E0B\u4E00\u6761"
+  m_Text: Next
 --- !u!222 &917372443
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -220618,7 +220618,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u89C6\u89D2\u590D\u4F4D"
+  m_Text: Reset view
 --- !u!222 &933275279
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -220769,7 +220769,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u9AD8\u6E29"
+  m_Text: Heat
 --- !u!222 &934893600
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -244141,7 +244141,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u4E0A\u4E00\u6761"
+  m_Text: Previous
 --- !u!222 &1014711997
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -244468,7 +244468,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u6682\u505C"
+  m_Text: Pause
 --- !u!222 &1018080745
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -249713,7 +249713,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u8FD4\u56DE"
+  m_Text: Back
 --- !u!222 &1059146204
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -256068,7 +256068,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u98CE"
+  m_Text: Wind
 --- !u!1 &1096489283
 GameObject:
   m_ObjectHideFlags: 0
@@ -257146,7 +257146,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u6682\u65E0\u4E8B\u4EF6"
+  m_Text: No incidents yet
 --- !u!222 &1105491052
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -257895,7 +257895,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u767D\u5929"
+  m_Text: Day
 --- !u!222 &1112423619
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -262045,7 +262045,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u591C\u665A"
+  m_Text: Night
 --- !u!222 &1145287797
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -263596,7 +263596,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u8FD4\u56DE"
+  m_Text: Back
 --- !u!222 &1155039900
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -264717,7 +264717,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u91CD\u7F6E"
+  m_Text: Reset
 --- !u!222 &1162952700
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -266850,7 +266850,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u591C\u665A"
+  m_Text: Night
 --- !u!222 &1175347814
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -279796,7 +279796,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u5C31\u7EEA"
+  m_Text: READY
 --- !u!4 &1264174075 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4334138648697093857, guid: 0406ca10d21a9447495c1d5e74760f0c, type: 3}
@@ -288086,7 +288086,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u96F7"
+  m_Text: Lightning
 --- !u!222 &1289447093
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -291975,7 +291975,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u786E\u8BA4\u91CD\u7F6E"
+  m_Text: Confirm reset
 --- !u!222 &1309821124
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -303251,7 +303251,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u5929\u6C14\u7BA1\u7406\u5458"
+  m_Text: WEATHER MANAGER
 --- !u!1 &1351848304
 GameObject:
   m_ObjectHideFlags: 0
@@ -309472,7 +309472,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u964D\u96E8"
+  m_Text: Rain
 --- !u!222 &1360149657
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -328399,7 +328399,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u653E\u5927 +"
+  m_Text: Larger
 --- !u!222 &1430461575
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -338174,7 +338174,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u5929\u6C14\n\u7BA1\u7406\u5458"
+  m_Text: "WEATHER\nMANAGER"
 --- !u!1 &1464511484
 GameObject:
   m_ObjectHideFlags: 0
@@ -339094,7 +339094,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u53F3\u8F6C"
+  m_Text: Right
 --- !u!222 &1473728437
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -370709,7 +370709,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u58F0\u97F3\uFF1A\u5F00"
+  m_Text: "Sound: on"
 --- !u!222 &1636160688
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -376827,7 +376827,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u8BE6\u60C5"
+  m_Text: Details
 --- !u!222 &1646324302
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -388772,7 +388772,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u96F7\u7535"
+  m_Text: Lightning
 --- !u!222 &1696221914
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -400973,7 +400973,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1748913249
 RectTransform:
   m_ObjectHideFlags: 0
@@ -419055,7 +419055,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1858546639
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -469231,7 +469231,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u8BBE\u7F6E"
+  m_Text: Settings
 --- !u!222 &2077172669
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -491026,7 +491026,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u70ED"
+  m_Text: Heat
 --- !u!222 &2132513367
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -491506,7 +491506,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u96E8"
+  m_Text: Rain
 --- !u!222 &2135039949
 CanvasRenderer:
   m_ObjectHideFlags: 0

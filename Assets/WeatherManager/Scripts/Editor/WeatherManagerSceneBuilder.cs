@@ -377,51 +377,30 @@ namespace WeatherManager.Editor
             }
 
             var ui = userInterfaces[0];
-            var englishButton = FindNamedComponent<Button>(ui.transform, "EnglishButton");
-            var chineseButton = FindNamedComponent<Button>(ui.transform, "ChineseButton");
             var resetButton = FindNamedComponent<Button>(ui.transform, "ResetButton");
             var title = FindNamedComponent<Text>(ui.transform, "Title");
             var statsTitle = FindNamedComponent<Text>(ui.transform, "StatsTitle");
+            var languageControl = FindNamedComponent<RectTransform>(ui.transform, "LanguageControl");
             var resetLabel = resetButton != null ? resetButton.GetComponentInChildren<Text>(true) : null;
-            if (englishButton == null || chineseButton == null || resetButton == null
-                || title == null || statsTitle == null || resetLabel == null)
+            if (resetButton == null || title == null || statsTitle == null || resetLabel == null)
             {
                 FailUiAcceptance(
-                    $"englishButton={englishButton != null}:chineseButton={chineseButton != null}"
-                    + $":resetButton={resetButton != null}:title={title != null}"
+                    $"resetButton={resetButton != null}:title={title != null}"
                     + $":statsTitle={statsTitle != null}:resetLabel={resetLabel != null}");
             }
 
-            englishButton.onClick.Invoke();
+            // English-only build: labels must resolve to English and the legacy language toggle stays hidden.
             var englishLanguage = LocalizationService.Current == AppLanguage.English;
-            var englishTitle = title.text;
-            var englishTitleValid = englishTitle == LocalizationService.Text("app.title");
+            var englishTitleValid = title.text == LocalizationService.Text("app.title");
             var englishStatsValid = statsTitle.text == LocalizationService.Text("label.city_status");
             var englishResetValid = resetLabel.text == LocalizationService.Text("button.reset");
-
-            chineseButton.onClick.Invoke();
-            var chineseLanguage = LocalizationService.Current == AppLanguage.Chinese;
-            var chineseTitle = title.text;
-            var chineseTitleValid = chineseTitle == LocalizationService.Text("app.title");
-            var chineseStatsValid = statsTitle.text == LocalizationService.Text("label.city_status");
-            var chineseResetValid = resetLabel.text == LocalizationService.Text("button.reset");
-            var languagesVisiblyDiffer = chineseTitle != englishTitle;
-
-            englishButton.onClick.Invoke();
-            var englishRestored = LocalizationService.Current == AppLanguage.English
-                && title.text == englishTitle
-                && statsTitle.text == LocalizationService.Text("label.city_status")
-                && resetLabel.text == LocalizationService.Text("button.reset");
-            if (!englishLanguage || !englishTitleValid || !englishStatsValid || !englishResetValid
-                || !chineseLanguage || !chineseTitleValid || !chineseStatsValid || !chineseResetValid
-                || !languagesVisiblyDiffer || !englishRestored)
+            var languageToggleHidden = languageControl == null || !languageControl.gameObject.activeInHierarchy;
+            if (!englishLanguage || !englishTitleValid || !englishStatsValid || !englishResetValid || !languageToggleHidden)
             {
                 FailUiAcceptance(
                     $"englishLanguage={englishLanguage}:englishTitle={englishTitleValid}"
                     + $":englishStats={englishStatsValid}:englishReset={englishResetValid}"
-                    + $":chineseLanguage={chineseLanguage}:chineseTitle={chineseTitleValid}"
-                    + $":chineseStats={chineseStatsValid}:chineseReset={chineseResetValid}"
-                    + $":visiblyDifferent={languagesVisiblyDiffer}:englishRestored={englishRestored}");
+                    + $":languageToggleHidden={languageToggleHidden}");
             }
 
             simulations[0].RunBiomeVisualDemo(BiomeType.Forest, WeatherType.Heat, 7f);
@@ -460,7 +439,7 @@ namespace WeatherManager.Editor
             }
 
             Debug.Log(
-                $"WEATHER_MANAGER_UI_ACCEPTANCE:pass=True:languageSequence=EN-ZH-EN"
+                $"WEATHER_MANAGER_UI_ACCEPTANCE:pass=True:language=EN"
                 + $":firesBeforeReset={firesBeforeReset}:firesAfterReset={after.ActiveFires}"
                 + $":floodAfterReset={after.FloodedCells}:tornadoesAfterReset={after.Tornadoes}"
                 + $":destroyedAfterReset={after.DestroyedObjects}:deadAfterReset={after.DeadResidents}");

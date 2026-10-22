@@ -74,7 +74,7 @@ namespace WeatherManager.Editor
                 }
             }
             island.localScale=originalScale;
-            foreach(var language in new[]{AppLanguage.Chinese,AppLanguage.English})
+            foreach(var language in new[]{AppLanguage.English})
             {
                 LocalizationService.SetLanguage(language);
                 foreach(var page in new[]{DashboardAction.Home,DashboardAction.Details,DashboardAction.Settings,DashboardAction.Reset})
@@ -84,7 +84,7 @@ namespace WeatherManager.Editor
                         Check(label.preferredHeight<=label.rectTransform.rect.height+2,"Text fits "+language+"/"+page+"/"+label.name);
                 }
             }
-            LocalizationService.SetLanguage(AppLanguage.Chinese);panel.Invoke(DashboardAction.Home);
+            LocalizationService.SetLanguage(AppLanguage.English);panel.Invoke(DashboardAction.Home);
             var resident=Object.FindFirstObjectByType<ResidentAgent>();var limb=resident.transform.Find("Left Leg");var firstAngle=limb.localRotation;
             yield return new WaitForSeconds(.6f);
             Check(Object.FindObjectsByType<ResidentMotionController>(FindObjectsSortMode.None).Length==84,"84 residents have shared Animator motions");

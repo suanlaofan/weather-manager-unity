@@ -35,9 +35,9 @@ namespace WeatherManager.Editor
             File.WriteAllText("Evidence/Revision/build-status.json", "{\"status\":\"building\"}");
             try
             {
-                PlayerSettings.bundleVersion = "0.5.0";
-                PlayerSettings.Android.bundleVersionCode = Math.Max(5,PlayerSettings.Android.bundleVersionCode);
-                var path = "Builds/PICO/WeatherManager-0.5.0-LowPoly-20260908.apk";
+                PlayerSettings.bundleVersion = "0.5.1";
+                PlayerSettings.Android.bundleVersionCode = Math.Max(6,PlayerSettings.Android.bundleVersionCode);
+                var path = "Builds/PICO/WeatherManager-0.5.1-LowPoly-EN.apk";
                 BuildApk(path);
                 File.WriteAllText("Evidence/Revision/build-status.json", "{\"status\":\"passed\",\"path\":\""+path+"\"}");
             }

@@ -378,7 +378,8 @@ namespace WeatherManager
             Debug.Log(
                 $"WEATHER_MANAGER_PICO_INPUT_MODE:model={SystemInfo.deviceModel}:"
                 + $"emulator={MrRuntimeBridge.IsPicoEmulator}:xr={MrRuntimeBridge.IsXrPresentationActive}:"
-                + $"mr={IsMrActive}:mouseFallback={AllowsEmulatorMouseCasting}");
+                + $"mr={IsMrActive}:mouseFallback={AllowsEmulatorMouseCasting}:"
+                + $"hardware={MrRuntimeBridge.BuildHardware}:product={MrRuntimeBridge.BuildProduct}");
             Debug.Log(
                 $"WEATHER_MANAGER_PICO_MR_ACTIVE:passthrough={usePassthrough}:"
                 + $"planeDetection={(usePassthrough ? "requested" : "emulator-disabled")}"

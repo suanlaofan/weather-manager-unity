@@ -59,8 +59,6 @@ namespace WeatherManager
         public bool IsDragging { get; internal set; }
         public UIController Owner => owner;
 
-        private bool Chinese => LocalizationService.Current == AppLanguage.Chinese;
-        private string L(string zh, string en) => Chinese ? zh : en;
 
         private void OnEnable()
         {
@@ -217,29 +215,27 @@ namespace WeatherManager
             if (spatialCanvas == null) return;
             manager ??= FindFirstObjectByType<GameManager>();
             tabletop ??= FindFirstObjectByType<MrTabletopExperience>();
-            SetText(sizeReadout, L($"大小  {tabletop?.ViewScalePercent ?? 100}%", $"Size  {tabletop?.ViewScalePercent ?? 100}%"));
-            SetText(rotationReadout, L($"旋转  {tabletop?.ViewYaw ?? 0:0}°", $"Rotation  {tabletop?.ViewYaw ?? 0:0}°"));
-            SetText(distanceReadout, L($"距离  {tabletop?.ViewDistance ?? 0:0.00} m", $"Distance  {tabletop?.ViewDistance ?? 0:0.00} m"));
+            SetText(sizeReadout, $"Size  {tabletop?.ViewScalePercent ?? 100}%");
+            SetText(rotationReadout, $"Rotation  {tabletop?.ViewYaw ?? 0:0}°");
+            SetText(distanceReadout, $"Distance  {tabletop?.ViewDistance ?? 0:0.00} m");
             if (stats != null)
             {
-                SetText(metrics, L($"居民 {stats.AliveResidents}/{stats.TotalResidents}     火灾 {stats.ActiveFires}     损毁 {stats.DestroyedObjects}",
-                    $"Residents {stats.AliveResidents}/{stats.TotalResidents}     Fires {stats.ActiveFires}     Lost {stats.DestroyedObjects}"));
-                if (page == 1) SetText(details, L(
-                    $"居民  {stats.AliveResidents} / {stats.TotalResidents}    受伤  {stats.InjuredResidents}\n火灾  {stats.ActiveFires}    受淹  {stats.FloodedPercent:0.0}%\n损毁  {stats.DestroyedObjects} / {stats.TotalDamageables}    龙卷风  {stats.Tornadoes}\n电网  {(stats.Blackout ? "中断" : "正常")}",
-                    $"Residents  {stats.AliveResidents} / {stats.TotalResidents}    Injured  {stats.InjuredResidents}\nFires  {stats.ActiveFires}    Flooded  {stats.FloodedPercent:0.0}%\nLost  {stats.DestroyedObjects} / {stats.TotalDamageables}    Tornadoes  {stats.Tornadoes}\nPower  {(stats.Blackout ? "Offline" : "Stable")}"));
+                SetText(metrics, $"Residents {stats.AliveResidents}/{stats.TotalResidents}     Fires {stats.ActiveFires}     Lost {stats.DestroyedObjects}");
+                if (page == 1) SetText(details,
+                    $"Residents  {stats.AliveResidents} / {stats.TotalResidents}    Injured  {stats.InjuredResidents}\nFires  {stats.ActiveFires}    Flooded  {stats.FloodedPercent:0.0}%\nLost  {stats.DestroyedObjects} / {stats.TotalDamageables}    Tornadoes  {stats.Tornadoes}\nPower  {(stats.Blackout ? "Offline" : "Stable")}");
             }
-            var state = manager != null && manager.TimeScale <= 0f ? L("已暂停", "Paused")
-                : casting ? L("施法中", "Casting") : valid ? L("待施法", "Ready") : L("目标无效", "No target");
+            var state = manager != null && manager.TimeScale <= 0f ? "Paused"
+                : casting ? "Casting" : valid ? "Ready" : "No target";
             SetText(current, WeatherPalette.Label(weather) + "  ·  " + state);
             if (Time.unscaledTime >= noticeUntil)
-                SetText(notice, L("按钮调整沙盘  ·  扳机施法  ·  左手 X 召回面板", "Adjust the table  ·  Trigger to cast  ·  Left X to recall"));
+                SetText(notice, "Adjust the table  ·  Trigger to cast  ·  Left X to recall");
             foreach (var a in actions)
             {
                 if (a == null) continue;
                 var selectedAction = (int)a.Action < 5 && (int)a.Action == (int)weather;
                 a.SetSelected(selectedAction);
                 if (a.Action == DashboardAction.Pause)
-                    a.SetLabel(manager != null && manager.TimeScale <= 0f ? L("继续", "Resume") : L("暂停", "Pause"));
+                    a.SetLabel(manager != null && manager.TimeScale <= 0f ? "Resume" : "Pause");
             }
         }
 
@@ -251,7 +247,7 @@ namespace WeatherManager
             eventCount = Math.Min(eventCount + 1, recentEvents.Length);
             noticeUntil = Time.unscaledTime + 4f;
             // Main panel reserves a single line; the complete text is retained in Events.
-            SetText(notice, message.Length > (Chinese ? 31 : 65) ? message.Substring(0, Chinese ? 30 : 64) + "…" : message);
+            SetText(notice, message.Length > 65 ? message.Substring(0, 64) + "…" : message);
             if (page == 4) RefreshEvent();
         }
         public void ClearFeedback()
@@ -276,7 +272,7 @@ namespace WeatherManager
                 case DashboardAction.NormalSpeed: manager?.SetTimeScale(1f); break;
                 case DashboardAction.DoubleSpeed: manager?.SetTimeScale(2f); break;
                 case DashboardAction.Sound: soundOn = !soundOn; manager?.SetSoundEnabled(soundOn); RefreshLabels(); break;
-                case DashboardAction.Language: LocalizationService.SetLanguage(Chinese ? AppLanguage.English : AppLanguage.Chinese); break;
+                case DashboardAction.Language: break; // English-only build: language toggle removed.
                 case DashboardAction.Reset: SetPage(3); break;
                 case DashboardAction.ConfirmReset: manager?.ResetWorld(); SetPage(0); break;
                 case DashboardAction.Recall: FindFirstObjectByType<MrTabletopExperience>()?.RecallDashboard(); break;
@@ -312,33 +308,39 @@ namespace WeatherManager
         private void RefreshEvent()
         {
             if (eventText == null) return;
-            SetText(eventText, eventCount == 0 ? L("暂无事件", "No incidents yet")
+            SetText(eventText, eventCount == 0 ? "No incidents yet"
                 : $"{eventIndex + 1} / {eventCount}\n\n{recentEvents[eventIndex]}");
         }
         private void RefreshLabels()
         {
-            SetText(heading, page switch { 1 => L("城市详情", "CITY DETAILS"), 2 => L("设置", "SETTINGS"),
-                3 => L("重置城镇", "RESET TOWN"), 4 => L("事件记录", "EVENT HISTORY"), _ => L("天气管理员", "WEATHER MANAGER") });
-            SetText(resetText, L("将恢复城镇并清除当前灾害。\n确定重置吗？", "Restore the town and clear all disasters?\nThis resets the current simulation."));
+            SetText(heading, page switch { 1 => "CITY DETAILS", 2 => "SETTINGS",
+                3 => "RESET TOWN", 4 => "EVENT HISTORY", _ => "WEATHER MANAGER" });
+            SetText(resetText, "Restore the town and clear all disasters?\nThis resets the current simulation.");
             foreach (var a in actions)
             {
                 if (a == null) continue;
+                if (a.Action == DashboardAction.Language)
+                {
+                    // English-only build: the language toggle is hidden.
+                    if (a.gameObject.activeSelf) a.gameObject.SetActive(false);
+                    continue;
+                }
                 a.SetLabel(a.Action switch {
-                    DashboardAction.Wind => L("大风", "Wind"), DashboardAction.Rain => L("降雨", "Rain"),
-                    DashboardAction.Electric => L("雷电", "Lightning"), DashboardAction.Snow => L("降雪", "Snow"),
-                    DashboardAction.Heat => L("高温", "Heat"), DashboardAction.Pause => L("暂停", "Pause"),
-                    DashboardAction.Details => L("详情", "Details"), DashboardAction.Settings => L("设置", "Settings"),
-                    DashboardAction.Home => L("返回", "Back"), DashboardAction.Day => L("白天", "Day"),
-                    DashboardAction.Night => L("夜晚", "Night"), DashboardAction.NormalSpeed => "1×",
-                    DashboardAction.DoubleSpeed => "2×", DashboardAction.Sound => soundOn ? L("声音：开", "Sound: on") : L("声音：关", "Sound: off"),
-                    DashboardAction.Language => Chinese ? "English" : "中文", DashboardAction.Reset => L("重置城镇", "Reset town"),
-                    DashboardAction.ConfirmReset => L("确认重置", "Confirm reset"), DashboardAction.Recall => L("召回面板", "Recall panel"),
-                    DashboardAction.Events => L("查看事件记录", "Event history"), DashboardAction.PreviousEvent => L("上一条", "Previous"),
-                    DashboardAction.ResetView => L("视角复位", "Reset view"),
-                    DashboardAction.Shrink => L("缩小 −", "Smaller"), DashboardAction.Enlarge => L("放大 +", "Larger"),
-                    DashboardAction.TurnLeft => L("左转", "Left"), DashboardAction.TurnRight => L("右转", "Right"),
-                    DashboardAction.BringCloser => L("拉近", "Closer"), DashboardAction.MoveFarther => L("推远", "Farther"),
-                    _ => L("下一条", "Next") });
+                    DashboardAction.Wind => "Wind", DashboardAction.Rain => "Rain",
+                    DashboardAction.Electric => "Lightning", DashboardAction.Snow => "Snow",
+                    DashboardAction.Heat => "Heat", DashboardAction.Pause => "Pause",
+                    DashboardAction.Details => "Details", DashboardAction.Settings => "Settings",
+                    DashboardAction.Home => "Back", DashboardAction.Day => "Day",
+                    DashboardAction.Night => "Night", DashboardAction.NormalSpeed => "1×",
+                    DashboardAction.DoubleSpeed => "2×", DashboardAction.Sound => soundOn ? "Sound: on" : "Sound: off",
+                    DashboardAction.Reset => "Reset town",
+                    DashboardAction.ConfirmReset => "Confirm reset", DashboardAction.Recall => "Recall panel",
+                    DashboardAction.Events => "Event history", DashboardAction.PreviousEvent => "Previous",
+                    DashboardAction.ResetView => "Reset view",
+                    DashboardAction.Shrink => "Smaller", DashboardAction.Enlarge => "Larger",
+                    DashboardAction.TurnLeft => "Left", DashboardAction.TurnRight => "Right",
+                    DashboardAction.BringCloser => "Closer", DashboardAction.MoveFarther => "Farther",
+                    _ => "Next" });
             }
         }
         private void BindButtons()
